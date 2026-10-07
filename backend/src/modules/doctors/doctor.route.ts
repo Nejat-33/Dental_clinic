@@ -82,4 +82,5 @@ router.delete('/:id', requireAuth, async (req, res) => {
   res.status(204).end();
 });
 
-export default router;
+ const doctorRouter = router
+export default doctorRouter;

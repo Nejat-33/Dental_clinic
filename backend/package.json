@@ -1,11 +1,12 @@
 {
   "name": "dental-clinic-backend",
   "version": "1.0.0",
-  "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js"
-  },
+ "scripts": {
+  "dev": "tsx watch src/server.ts",
+  "build": "prisma generate && tsc",
+  "start": "node dist/server.js",
+  "migrate:deploy": "prisma migrate deploy"
+},
   "type": "module",
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -14,6 +15,7 @@
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "bcrypt": "^6.0.0",
+    "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^18.0.6",

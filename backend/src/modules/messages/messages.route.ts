@@ -78,7 +78,7 @@ router.get('/:id', requireAuth, async (req, res) => {
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     
       if (!id) {
-        throw new AppError(400, 'Invalid appointment ID');
+        throw new AppError(400, 'Invalid message ID');
       }
   const message = await prisma.message.findUnique({ where: { id} });
   if (!message) throw new AppError(404, 'Message not found');
@@ -89,7 +89,7 @@ router.patch('/:id/status', requireAuth, validateBody(statusSchema), async (req,
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
   if (!id) {
-    throw new AppError(400, 'Invalid appointment ID');
+    throw new AppError(400, 'Invalid message ID');
   }
   const { status } = res.locals.body as z.infer<typeof statusSchema>;
   res.json(await prisma.message.update({ where: { id }, data: { status } }));
@@ -99,7 +99,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     
       if (!id) {
-        throw new AppError(400, 'Invalid appointment ID');
+        throw new AppError(400, 'Invalid message ID');
       }
   await prisma.message.delete({ where: { id } });
   res.status(204).end();

@@ -8,6 +8,7 @@ export const env = z.object({
   CLIENT_URL: z.string().url(),
   PORT: z.coerce.number().default(4000),
   NODE_ENV: z.enum(['development', 'production']).default('development'),
-API_URL: z.string().url(),                 
-UPLOAD_DIR: z.string().default('uploads'),
+  CLOUDINARY_CLOUD_NAME: z.string().min(1),
+  CLOUDINARY_API_KEY: z.string().min(1),
+  CLOUDINARY_API_SECRET: z.string().min(1),
 }).parse(process.env);
