@@ -22,13 +22,12 @@ const baseSchema = z.object({
 
 const createSchema = baseSchema.extend({ isActive: z.boolean().default(true) });
 
-// Built from baseSchema, not createSchema, so isActive's default can't reset the flag on PATCH
+
 const updateSchema = baseSchema
   .extend({ isActive: z.boolean() })
   .partial()
   .refine((o) => Object.keys(o).length > 0, 'No fields to update');
 
-/* ---------- Public ---------- */
 
 router.get('/', async (_req, res) => {
   res.json(
@@ -40,7 +39,6 @@ router.get('/', async (_req, res) => {
   );
 });
 
-// /all must stay above /:slug
 router.get('/all', requireAuth, async (_req, res) => {
   res.json(await prisma.service.findMany({ orderBy: { createdAt: 'desc' } }));
 });
@@ -53,7 +51,6 @@ router.get('/:slug', async (req, res) => {
   res.json(service);
 });
 
-/* ---------- Admin ---------- */
 
 router.post('/', requireAuth, validateBody(createSchema), async (_req, res) => {
   const { slug, ...rest } = res.locals.body as z.infer<typeof createSchema>;
@@ -77,10 +74,12 @@ router.delete('/:id', requireAuth, async (req, res) => {
    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     
       if (!id) {
-        throw new AppError(400, 'Invalid service ID');
+        throw new AppError(400, 'Invalid Service ID');
       }
   await prisma.service.delete({ where: { id} });
   res.status(204).end();
 });
 
-export default router;
+const serviceRouter = router
+
+export default serviceRouter;

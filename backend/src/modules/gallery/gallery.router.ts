@@ -24,7 +24,6 @@ const updateSchema = baseSchema
 
 const publicQuerySchema = z.object({ category: z.string().trim().max(50).optional() });
 
-/* ---------- Public ---------- */
 
 router.get('/', validateQuery(publicQuerySchema), async (_req, res) => {
   const { category } = res.locals.query as z.infer<typeof publicQuerySchema>;
@@ -32,7 +31,7 @@ router.get('/', validateQuery(publicQuerySchema), async (_req, res) => {
   res.json(await prisma.galleryImage.findMany({ where, orderBy: { createdAt: 'desc' } }));
 });
 
-/* ---------- Admin ---------- */
+
 
 router.get('/all', requireAuth, async (_req, res) => {
   res.json(await prisma.galleryImage.findMany({ orderBy: { createdAt: 'desc' } }));
@@ -63,4 +62,6 @@ router.delete('/:id', requireAuth, async (req, res) => {
   res.status(204).end();
 });
 
-export default router;
+const galleryRouter = router
+
+export default galleryRouter;

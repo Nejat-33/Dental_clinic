@@ -83,18 +83,17 @@ model Appointment {
 
 model Message {
   id          String        @id @default(uuid())
-
   name        String
   phone       String?
   email       String
   subject     String?
   message     String
   status      MessageStatus @default(UNREAD)
-
+  deletedAt   DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  @@index([status])
+   @@index([deletedAt])
 }
 
 model Testimonial {

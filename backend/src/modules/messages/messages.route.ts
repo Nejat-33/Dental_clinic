@@ -1,4 +1,3 @@
-// src/modules/messages/messages.routes.ts
 import { Router } from 'express';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
@@ -17,7 +16,7 @@ const createSchema = z.object({
   phone: phoneSchema.optional(),
   subject: z.string().trim().max(150).optional(),
   message: z.string().trim().min(10).max(2000),
-  website: z.string().optional(), // honeypot: hidden field, real users leave it empty
+  website: z.string().optional(), 
 });
 
 const listSchema = z.object({
@@ -34,13 +33,12 @@ const messageLimiter = rateLimit({
   message: { message: 'Too many messages, try again later' },
 });
 
-/* ---------- Public ---------- */
+
 
 router.post('/', messageLimiter, validateBody(createSchema), async (_req, res) => {
   const { website, ...data } = res.locals.body as z.infer<typeof createSchema>;
-  if (website) return res.status(201).json({ ok: true }); // bot: pretend success, save nothing
-
- await prisma.message.create({
+  if (website) return res.status(201).json({ ok: true }); 
+  await prisma.message.create({
     data: {
       ...data,
       phone: data.phone ?? null,
@@ -53,13 +51,14 @@ router.post('/', messageLimiter, validateBody(createSchema), async (_req, res) =
 
 
 router.get('/unread-count', requireAuth, async (_req, res) => {
-  const count = await prisma.message.count({ where: { status: MessageStatus.UNREAD } });
+  const count = await prisma.message.count({ where: { status: MessageStatus.UNREAD, deletedAt: null } });
   res.json({ count });
 });
 
 router.get('/', requireAuth, validateQuery(listSchema), async (_req, res) => {
   const { status, page, limit } = res.locals.query as z.infer<typeof listSchema>;
-  const where: Prisma.MessageWhereInput = status ? { status } : {};
+  const where: Prisma.MessageWhereInput = { deletedAt: null, ...(status && { status }) };
+ 
 
   const [data, total] = await Promise.all([
     prisma.message.findMany({
@@ -85,6 +84,38 @@ router.get('/:id', requireAuth, async (req, res) => {
   res.json(message);
 });
 
+router.get('/trash', requireAuth, async (_req, res) => {
+  res.json(
+    await prisma.message.findMany({
+      where: { deletedAt: { not: null } },
+      orderBy: { deletedAt: 'desc' },
+    }),
+  );
+});
+
+router.delete('/:id', requireAuth, async (req, res) => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  if (!id) throw new AppError(400, 'Invalid message ID');
+
+  await prisma.message.update({
+    where: { id, deletedAt: null }, 
+    data: { deletedAt: new Date() },
+  });
+  res.status(204).end();
+});
+
+router.post('/:id/restore', requireAuth, async (req, res) => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  if (!id) throw new AppError(400, 'Invalid message ID');
+
+  res.json(
+    await prisma.message.update({
+      where: { id, deletedAt: { not: null } },
+      data: { deletedAt: null },
+    }),
+  );
+});
+
 router.patch('/:id/status', requireAuth, validateBody(statusSchema), async (req, res) => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
@@ -95,13 +126,11 @@ router.patch('/:id/status', requireAuth, validateBody(statusSchema), async (req,
   res.json(await prisma.message.update({ where: { id }, data: { status } }));
 });
 
-router.delete('/:id', requireAuth, async (req, res) => {
-      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    
-      if (!id) {
-        throw new AppError(400, 'Invalid message ID');
-      }
-  await prisma.message.delete({ where: { id } });
+router.delete('/:id/permanent', requireAuth, async (req, res) => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  if (!id) throw new AppError(400, 'Invalid message ID');
+
+  await prisma.message.delete({ where: { id, deletedAt: { not: null } } });
   res.status(204).end();
 });
 

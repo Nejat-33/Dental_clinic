@@ -1,10 +1,10 @@
-// src/server.ts
+
 import { app } from './app.js';
 import { env } from './config/env.js';
 import { prisma } from './lib/prisma.js';
 
 async function main() {
-  await prisma.$connect(); // crash at startup if the DB is unreachable, not on the first request
+  await prisma.$connect(); 
 
   const server = app.listen(env.PORT, () => {
     console.log(`API listening on port ${env.PORT}`);
@@ -16,7 +16,7 @@ async function main() {
       await prisma.$disconnect();
       process.exit(0);
     });
-    setTimeout(() => process.exit(1), 10_000).unref(); // force exit if connections hang
+    setTimeout(() => process.exit(1), 10_000).unref(); 
   };
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));

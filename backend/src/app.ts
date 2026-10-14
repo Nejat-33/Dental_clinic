@@ -5,7 +5,8 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import apiRouter  from './routes/index.js';
 import { env } from './config/env.js';
-
+import {errorHandler} from './middleware/error.handler.js';
+import {notFound }from './middleware/error.handler.js';
 
 export const app = express();
 
@@ -27,3 +28,5 @@ app.use(
   rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false }),
 );
 app.use('/api', apiRouter);
+app.use(notFound);
+app.use(errorHandler); // must be last

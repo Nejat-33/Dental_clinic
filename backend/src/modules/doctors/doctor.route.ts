@@ -26,7 +26,6 @@ const updateSchema = baseSchema
   .partial()
   .refine((o) => Object.keys(o).length > 0, 'No fields to update');
 
-/* ---------- Public ---------- */
 
 router.get('/', async (_req, res) => {
   res.json(
@@ -37,7 +36,7 @@ router.get('/', async (_req, res) => {
   );
 });
 
-/* ---------- Admin ---------- */
+
 
 router.get('/all', requireAuth, async (_req, res) => {
   res.json(await prisma.doctor.findMany({ orderBy: { createdAt: 'asc' } }));
@@ -51,10 +50,8 @@ router.post('/', requireAuth, validateBody(createSchema), async (_req, res) => {
       name: data.name,
       specialization: data.specialization,
       isActive: data.isActive ?? true,
-      bio: data.bio ?? null,
       education: data.education ?? null,
       experience: data.experience ?? null,
-      languages: data.languages ?? null,
       imageUrl: data.imageUrl ?? null,
     },
   });
