@@ -34,11 +34,8 @@ async function main() {
     },
   });
 
-  console.log(`✅ Admin created: ${admin.email}`);
+  console.log(`Admin created: ${admin.email}`);
 
-  // --------------------------------------------------
-  // 2. SERVICES
-  // --------------------------------------------------
 
   const services = await Promise.all([
     prisma.service.upsert({
@@ -149,10 +146,8 @@ async function main() {
       data: {
         name: "Dr. Ahmed Hassan",
         specialization: "General & Restorative Dentistry",
-        bio: "Dr. Ahmed focuses on preventive, restorative, and general dental care with an emphasis on patient comfort.",
         education: "Doctor of Dental Medicine",
         experience: "8+ years of clinical experience",
-        languages: "Amharic, English, Arabic",
         imageUrl: "/images/doctors/dr-ahmed.jpg",
         isActive: true,
       },
@@ -162,10 +157,8 @@ async function main() {
       data: {
         name: "Dr. Sara Mohammed",
         specialization: "Cosmetic Dentistry",
-        bio: "Dr. Sara specializes in cosmetic dental procedures and helping patients achieve healthy, confident smiles.",
         education: "Doctor of Dental Medicine",
         experience: "6+ years of clinical experience",
-        languages: "Amharic, English",
         imageUrl: "/images/doctors/dr-sara.jpg",
         isActive: true,
       },
@@ -175,10 +168,8 @@ async function main() {
       data: {
         name: "Dr. Daniel Tesfaye",
         specialization: "Endodontics & Restorative Dentistry",
-        bio: "Dr. Daniel provides restorative and endodontic care with a focus on accurate diagnosis and patient-centered treatment.",
         education: "Doctor of Dental Medicine",
         experience: "10+ years of clinical experience",
-        languages: "Amharic, English",
         imageUrl: "/images/doctors/dr-daniel.jpg",
         isActive: true,
       },

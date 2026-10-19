@@ -50,3 +50,13 @@ export const clinicHour = (iso: string) =>
       new Date(iso),
     ),
   ) % 24;
+
+export const formatClinicShort = (iso: string) =>
+  new Intl.DateTimeFormat('en-US', {
+    timeZone: CLINIC_TZ,
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(iso));
