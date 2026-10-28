@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
+import NextImage from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Clock, Phone, Smile } from 'lucide-react';
@@ -53,7 +53,7 @@ export default async function ServiceDetailPage({ params }: Props) {
           <div className="lg:col-span-2">
             <div className="relative aspect-video overflow-hidden rounded-3xl bg-brand-50">
               {service.imageUrl ? (
-                <Image
+                <NextImage
                   src={service.imageUrl}
                   alt={service.name}
                   fill

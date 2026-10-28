@@ -11,10 +11,10 @@ export const site = {
     { days: 'Sunday', time: 'Closed' },
   ],
   nav: [
-    { label: 'Home', href: '/' },
+    { label: 'About Us', href: '/about' },
     { label: 'Services', href: '/services' },
-    { label: 'Doctors', href: '/doctors' },
-    { label: 'About', href: '/about' },
+    { label: 'Specialists', href: '/doctors' },
+    { label: 'Calculator', href: '/calculator' },
     { label: 'Testimonials', href: '/testimonials' },
     { label: 'Contact', href: '/contact' },
   ],

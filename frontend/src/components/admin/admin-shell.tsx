@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -8,7 +8,11 @@ import { CalendarDays, ExternalLink, LayoutDashboard, Loader2, LogOut, Mail, Sta
 import { api, ApiError } from '@/lib/api';
 import { useAdmin } from '@/lib/auth';
 import { cn } from '@/lib/cn';
+import { toast } from 'sonner';
+import { Appointment, Paginated } from '@/types/api';
 import { site } from '@/config/site';
+
+
 
 // Add new admin pages here as we build them
 const nav = [
@@ -34,6 +38,32 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   refetchInterval: 60_000,
 });
 const unreadCount = unread.data?.count ?? 0;
+ const pending = useQuery({
+  queryKey: ['appointments', 'pending-count'],
+  queryFn: () => api<Paginated<Appointment>>('/appointments?status=PENDING&page=1&limit=1'),
+  enabled: !!me.data,
+  refetchInterval: 30_000,
+  refetchIntervalInBackground: true,
+});
+const pendingCount = pending.data?.meta.total ?? 0;
+const lastCount = useRef<number | null>(null);
+
+// Toast whenever the pending count goes up (not on first load, not when you confirm one)
+useEffect(() => {
+  if (!pending.data) return;
+  const total = pending.data.meta.total;
+  if (lastCount.current !== null && total > lastCount.current) {
+    const n = total - lastCount.current;
+    toast.info(n === 1 ? 'New appointment request' : `${n} new appointment requests`, {
+      action: { label: 'View', onClick: () => router.push('/admin/appointments') },
+      duration: 10_000,
+    });
+  }
+  lastCount.current = total;
+}, [pending.data, router]);
+
+const badge = (href: string) =>
+  href === '/admin/appointments' ? pendingCount : href === '/admin/messages' ? unreadCount : 0;
 
   const unauthorized = me.error instanceof ApiError && me.error.status === 401;
 
@@ -100,9 +130,9 @@ const unreadCount = unread.data?.count ?? 0;
               )}
             >
               <Icon className="size-5" /> {label}
-              {href === '/admin/messages' && unreadCount > 0 && (
+              {badge(href) > 0 && (
   <span className="ml-auto rounded-full bg-brand-600 px-2 py-0.5 text-xs font-semibold text-white">
-    {unreadCount}
+    {badge(href)}
   </span>
 )}
             </Link>
@@ -129,20 +159,20 @@ const unreadCount = unread.data?.count ?? 0;
             </button>
           </div>
           <nav className="flex gap-2 overflow-x-auto px-4 pb-3">
-            {nav.map(({ label, href }) => (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  'shrink-0 rounded-full px-4 py-1.5 text-sm font-medium',
-                  isActive(href) ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700',
-                )}
-              >
-                {label}
-                {href === '/admin/messages' && unreadCount > 0 && ` (${unreadCount})`}
-              </Link>
-            ))}
-          </nav>
+  {nav.map(({ label, href }) => (
+    <Link
+      key={href}
+      href={href}
+      className={cn(
+        'shrink-0 rounded-full px-4 py-1.5 text-sm font-medium',
+        isActive(href) ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700',
+      )}
+    >
+      {label}
+      {badge(href) > 0 && ` (${badge(href)})`}   {/* <- old line */}
+    </Link>
+  ))}
+</nav>
         </header>
 
         <main className="p-4 sm:p-8">{children}</main>

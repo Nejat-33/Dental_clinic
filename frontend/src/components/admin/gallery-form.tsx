@@ -53,7 +53,6 @@ export function GalleryForm({ item, categories, onDone }: Props) {
       title: v.title || null,
       category: v.category || null,
       isPublished: v.isPublished,
-      // Only send the image when it changed or when creating
       ...(img.changed || !item ? { imageUrl: img.image } : {}),
     };
 
@@ -109,6 +108,9 @@ export function GalleryForm({ item, categories, onDone }: Props) {
           aria-invalid={!!errors.category}
           {...register('category')}
         />
+        <p className="mt-1.5 text-xs text-slate-500">
+          To show a transformation, give both photos the same case name, add “Before” or “After” to each title, and use the same treatment category.
+        </p>
         <datalist id="gallery-categories">
           {categories.map((c) => (
             <option key={c} value={c} />

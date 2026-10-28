@@ -1,0 +1,15 @@
+
+{
+  "clinic_name": null,
+  "address": null,
+  "opening_hours": {
+    "monday_to_friday": "8:00 AM - 5:00 PM",
+    "saturday": "8:00 AM - 1:00 PM",
+    "sunday": "Closed"
+  },
+  "technologies": [],
+  "corporate_care": null,
+  "community_outreach": null,
+  "faqs": [],
+  "pricing_policy": "Prices have not been provided. Ask the clinic to confirm current prices."
+}

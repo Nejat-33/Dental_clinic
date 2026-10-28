@@ -13,28 +13,32 @@ export function Navbar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
+  const isActive = (href: string) => {
+    const route = href.startsWith('/#') ? '/' : href;
+    return pathname === route || (route !== '/' && pathname.startsWith(`${route}/`));
+  };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/80 backdrop-blur">
-      <Container className="flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 text-lg font-bold text-slate-900">
-          <span className="grid size-9 place-items-center rounded-xl bg-brand-600 text-white">
+    <header className="sticky top-0 z-50 border-b border-[#e9ddd7]/80 bg-[#fdf7f5]/90 backdrop-blur-xl">
+      <Container className="flex h-[76px] items-center justify-between">
+        <Link href="/" className="flex items-center gap-2.5 text-sm font-semibold tracking-tight text-[#2c1d18] sm:text-base">
+          <span className="grid size-10 place-items-center rounded-full bg-[#2c1d18] text-white">
             <Smile className="size-5" />
           </span>
           {site.name}
         </Link>
 
-        <nav className="hidden items-center gap-1 lg:flex">
+        <nav className="hidden items-center gap-7 lg:flex" aria-label="Main navigation">
           {site.nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive(item.href) ? 'page' : undefined}
               className={cn(
-                'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                'text-xs font-medium transition-colors',
                 isActive(item.href)
-                  ? 'bg-brand-50 text-brand-700'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                  ? 'text-[#d57f6d]'
+                  : 'text-[#74635d] hover:text-[#d57f6d]',
               )}
             >
               {item.label}
@@ -44,11 +48,16 @@ export function Navbar() {
 
         <div className="flex items-center gap-2">
           <div className="hidden sm:block">
-            <ButtonLink href="/appointment">Book appointment</ButtonLink>
+            <ButtonLink
+              href="/contact"
+              className="rounded-full bg-[#d57f6d] px-5 py-3 text-xs font-semibold text-white hover:bg-[#bd6858]"
+            >
+              Contact
+            </ButtonLink>
           </div>
           <button
             type="button"
-            className="grid size-10 place-items-center rounded-lg text-slate-700 hover:bg-slate-100 lg:hidden"
+            className="grid size-10 place-items-center rounded-full border border-[#e7d8d1] text-[#74635d] hover:bg-white lg:hidden"
             onClick={() => setOpen((v) => !v)}
             aria-label="Toggle menu"
             aria-expanded={open}
@@ -59,23 +68,23 @@ export function Navbar() {
       </Container>
 
       {open && (
-        <div className="border-t border-slate-100 bg-white lg:hidden">
-          <Container className="flex flex-col gap-1 py-3">
+        <div className="border-t border-[#e9ddd7] bg-[#fdf7f5] lg:hidden">
+          <Container className="grid gap-1 py-3">
             {site.nav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  'rounded-lg px-3 py-3 text-base font-medium',
-                  isActive(item.href) ? 'bg-brand-50 text-brand-700' : 'text-slate-700',
+                  'rounded-xl px-3 py-3 text-sm font-medium',
+                  isActive(item.href) ? 'bg-white text-[#d57f6d]' : 'text-[#74635d] hover:bg-white',
                 )}
               >
                 {item.label}
               </Link>
             ))}
-            <ButtonLink href="/appointment" size="lg" className="mt-2" onClick={() => setOpen(false)}>
-              Book appointment
+            <ButtonLink href="/contact" size="lg" className="mt-2 rounded-full bg-[#d57f6d] text-white hover:bg-[#bd6858]" onClick={() => setOpen(false)}>
+              Contact
             </ButtonLink>
           </Container>
         </div>
