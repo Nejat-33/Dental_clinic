@@ -59,24 +59,47 @@ enum MessageStatus {
   ARCHIVED
 }
 
-model User {
-  id           String @id @default(uuid())
-  name         String
-  email        String @unique
-  passwordHash String
+enum AppointmentNotificationChannel {
+  EMAIL
+  TELEGRAM
+}
 
+enum AppointmentNotificationStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum AppointmentNotificationType {
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_REMINDER
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_RESCHEDULED
+  DOCTOR_ASSIGNED
+}
+
+model User {
+  id                         String                  @id @default(uuid())
+  name                       String
+  email                      String                  @unique
+  passwordHash               String
+  processedRefunds           Refund[]                @relation("RefundProcessor")
   role                       UserRole                @default(RECEPTIONIST)
   appointmentAssignmentsMade AppointmentAssignment[] @relation("AppointmentAssignmentActor")
 
+  paymentsReceived        Payment[]        @relation("PaymentReceiver")
   doctorProfile           Doctor?
+  prescriptions           Prescription[]
   auditLogs               AuditLog[]
   isActive                Boolean          @default(true)
   uploadedDoctorDocuments DoctorDocument[] @relation("DoctorDocumentUploader")
   reviewedDoctorDocuments DoctorDocument[] @relation("DoctorDocumentReviewer")
   verifiedDoctors         Doctor[]         @relation("DoctorVerifier")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  voidedInvoices          Invoice[]        @relation("InvoiceVoider")
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
 }
 
 model Patient {
@@ -107,7 +130,9 @@ model Service {
   duration         Int?
   isActive         Boolean @default(true)
 
-  appointments Appointment[]
+  appointments    Appointment[]
+  price           Decimal          @default(0) @db.Decimal(10, 2)
+  visitTreatments VisitTreatment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -203,13 +228,14 @@ model Appointment {
   serviceId String
   service   Service @relation(fields: [serviceId], references: [id])
 
-  patientId String?
-  patient   Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
-  visit     Visit?
-  doctorId  String?
-  doctor    Doctor?  @relation(fields: [doctorId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  notifications AppointmentNotification[]
+  patientId     String?
+  patient       Patient?                  @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  visit         Visit?
+  doctorId      String?
+  doctor        Doctor?                   @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
 
   @@index([serviceId])
   @@index([status])
@@ -248,6 +274,21 @@ model Testimonial {
   @@index([isPublished])
 }
 
+enum InvoiceStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOBILE_MONEY
+  CARD
+  OTHER
+}
+
 model GalleryImage {
   id          String  @id @default(uuid())
   title       String?
@@ -273,9 +314,11 @@ model Visit {
   doctorId String?
   doctor   Doctor? @relation(fields: [doctorId], references: [id], onDelete: SetNull)
 
-  diagnosis String?
-  notes     String?
-  visitDate DateTime @default(now())
+  diagnosis     String?
+  notes         String?
+  visitDate     DateTime       @default(now())
+  invoice       Invoice?
+  prescriptions Prescription[]
 
   treatments VisitTreatment[]
   status     VisitStatus      @default(IN_PROGRESS)
@@ -295,6 +338,9 @@ model VisitTreatment {
   visitId String
   visit   Visit  @relation(fields: [visitId], references: [id], onDelete: Cascade)
 
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
   name        String
   description String?
   quantity    Int     @default(1)
@@ -304,6 +350,7 @@ model VisitTreatment {
   updatedAt DateTime @updatedAt
 
   @@index([visitId])
+  @@index([serviceId])
 }
 
 model AuditLog {
@@ -344,4 +391,133 @@ model AppointmentAssignment {
   @@index([doctorId])
   @@index([assignedById])
   @@index([assignedAt])
+}
+
+model Invoice {
+  id            String @id @default(uuid())
+  invoiceNumber String @unique
+
+  visitId String @unique
+  visit   Visit  @relation(fields: [visitId], references: [id], onDelete: Restrict)
+
+  subtotal Decimal @db.Decimal(10, 2)
+  discount Decimal @default(0) @db.Decimal(10, 2)
+  tax      Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @db.Decimal(10, 2)
+
+  amountPaid Decimal @default(0) @db.Decimal(10, 2)
+  balance    Decimal @db.Decimal(10, 2)
+
+  status     InvoiceStatus @default(PENDING)
+  voidReason String?
+  voidedAt   DateTime?
+  voidedById String?
+  voidedBy   User?         @relation("InvoiceVoider", fields: [voidedById], references: [id], onDelete: SetNull)
+
+  payments Payment[]
+
+  issuedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([issuedAt])
+}
+
+model Payment {
+  id String @id @default(uuid())
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  amount    Decimal       @db.Decimal(10, 2)
+  method    PaymentMethod
+  reference String?
+
+  receivedById String
+  receivedBy   User   @relation("PaymentReceiver", fields: [receivedById], references: [id], onDelete: Restrict)
+
+  receivedAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  refundedAmount Decimal  @default(0) @db.Decimal(10, 2)
+  refunds        Refund[]
+
+  @@index([invoiceId])
+  @@index([receivedById])
+  @@index([receivedAt])
+}
+
+model Refund {
+  id String @id @default(uuid())
+
+  paymentId String
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  amount Decimal @db.Decimal(10, 2)
+  reason String
+
+  processedById String
+  processedBy   User   @relation("RefundProcessor", fields: [processedById], references: [id], onDelete: Restrict)
+
+  refundedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([paymentId])
+  @@index([processedById])
+  @@index([refundedAt])
+}
+
+model Prescription {
+  id      String @id @default(uuid())
+  visitId String
+  visit   Visit  @relation(fields: [visitId], references: [id], onDelete: Restrict)
+
+  medicationName String
+  dosage         String
+  frequency      String
+  duration       String
+  quantity       Int
+  instructions   String?
+
+  prescribedById String
+  prescribedBy   User   @relation(fields: [prescribedById], references: [id], onDelete: Restrict)
+
+  prescribedAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([visitId])
+  @@index([prescribedById])
+  @@index([prescribedAt])
+}
+
+model AppointmentNotification {
+  id String @id @default(uuid())
+
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+
+  channel AppointmentNotificationChannel
+  type    AppointmentNotificationType
+
+  recipient String
+  subject   String?
+  message   String
+
+  status AppointmentNotificationStatus @default(PENDING)
+
+  scheduledAt DateTime
+  sentAt      DateTime?
+
+  attempts  Int     @default(0)
+  lastError String?
+
+  idempotencyKey String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([appointmentId])
+  @@index([status, scheduledAt])
+  @@index([channel, status])
 }

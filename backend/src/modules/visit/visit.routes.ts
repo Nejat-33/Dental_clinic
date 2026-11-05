@@ -47,6 +47,15 @@ const createTreatmentSchema = z.object({
   unitCost: z.number().min(0).max(99999999.99),
 });
 
+const createPrescriptionSchema = z.object({
+  medicationName: z.string().trim().min(2).max(150),
+  dosage: z.string().trim().min(1).max(100),
+  frequency: z.string().trim().min(1).max(100),
+  duration: z.string().trim().min(1).max(100),
+  quantity: z.number().int().positive().max(10000),
+  instructions: z.string().trim().max(1000).nullable().optional(),
+});
+
 // Update treatment
 const updateTreatmentSchema = z.object({
   name: z.string().trim().min(2).max(150).optional(),
@@ -63,6 +72,16 @@ const listVisitsSchema = z.object({
   doctorId: z.uuid().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+const addTreatmentFromServiceSchema = z.object({
+  serviceId: z.string().uuid(),
+  quantity: z.number().int().min(1).max(100).default(1),
+});
+
+const updateClinicalNotesSchema = z.object({
+  diagnosis: z.string().trim().min(2).max(2000),
+  notes: z.string().trim().max(10000).nullable().optional(),
 });
 
 function calculateVisitTotals(
@@ -322,6 +341,104 @@ router.get(
 );
 
 
+// PATCH /api/visits/:id/clinical-notes
+router.patch(
+  '/:id/clinical-notes',
+  requireAuth,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.DENTIST),
+  validateBody(updateClinicalNotesSchema),
+  async (req, res) => {
+    const visitId = Array.isArray(req.params.id)
+      ? req.params.id[0]
+      : req.params.id;
+
+    if (!visitId) {
+      throw new AppError(400, 'Invalid visit ID');
+    }
+
+    const userId = req.user!.id;
+    const data = res.locals.body as z.infer<
+      typeof updateClinicalNotesSchema
+    >;
+
+    const visit = await prisma.visit.findUnique({
+      where: { id: visitId },
+      select: {
+        id: true,
+        status: true,
+        doctorId: true,
+        diagnosis: true,
+        notes: true,
+      },
+    });
+
+    if (!visit) {
+      throw new AppError(404, 'Visit not found');
+    }
+
+    if (visit.status !== 'IN_PROGRESS') {
+      throw new AppError(
+        400,
+        'Clinical notes cannot be changed after visit completion'
+      );
+    }
+
+    if (req.user!.role === UserRole.DENTIST) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          doctorProfile: {
+            select: { id: true },
+          },
+        },
+      });
+
+      if (
+        !user?.doctorProfile ||
+        visit.doctorId !== user.doctorProfile.id
+      ) {
+        throw new AppError(
+          403,
+          'You can only update clinical notes for your own visits'
+        );
+      }
+    }
+
+    const updatedVisit = await prisma.$transaction(async (tx) => {
+      const updated = await tx.visit.update({
+        where: { id: visitId },
+        data: {
+          diagnosis: data.diagnosis,
+          notes: data.notes ?? null,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: 'CLINICAL_NOTES_UPDATED',
+          entityType: 'Visit',
+          entityId: visitId,
+          details: {
+            previousDiagnosis: visit.diagnosis,
+            newDiagnosis: data.diagnosis,
+            notesUpdated: true,
+          },
+        },
+      });
+
+      return updated;
+    });
+
+    res.json({
+      success: true,
+      message: 'Clinical notes updated successfully',
+      data: updatedVisit,
+    });
+  }
+);
+
+
 router.get('/:id', requireAuth, async (req, res) => {
   const id = getId(req.params.id, 'visit ID');
 
@@ -442,6 +559,116 @@ router.post(
   }
 );
 
+
+router.post(
+  '/:id/prescriptions',
+  requireAuth,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.DENTIST),
+  validateBody(createPrescriptionSchema),
+  async (req, res) => {
+    const visitId = Array.isArray(req.params.id)
+      ? req.params.id[0]
+      : req.params.id;
+
+    if (!visitId) {
+      throw new AppError(400, 'Invalid visit ID');
+    }
+
+    const userId = req.user!.id;
+    const data = res.locals.body as z.infer<
+      typeof createPrescriptionSchema
+    >;
+
+    const visit = await prisma.visit.findUnique({
+      where: { id: visitId },
+      select: {
+        id: true,
+        status: true,
+        doctorId: true,
+      },
+    });
+
+    if (!visit) {
+      throw new AppError(404, 'Visit not found');
+    }
+
+    if (visit.status !== 'IN_PROGRESS') {
+      throw new AppError(
+        400,
+        'Prescriptions can only be added to an active visit'
+      );
+    }
+
+    if (req.user!.role === UserRole.DENTIST) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          doctorProfile: {
+            select: { id: true },
+          },
+        },
+      });
+
+      if (
+        !user?.doctorProfile ||
+        visit.doctorId !== user.doctorProfile.id
+      ) {
+        throw new AppError(
+          403,
+          'You can only prescribe for your own visits'
+        );
+      }
+    }
+
+    const prescription = await prisma.$transaction(async (tx) => {
+      const created = await tx.prescription.create({
+        data: {
+          visitId,
+          medicationName: data.medicationName,
+          dosage: data.dosage,
+          frequency: data.frequency,
+          duration: data.duration,
+          quantity: data.quantity,
+          instructions: data.instructions ?? null,
+          prescribedById: userId,
+        },
+        include: {
+          prescribedBy: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: 'PRESCRIPTION_CREATED',
+          entityType: 'Prescription',
+          entityId: created.id,
+          details: {
+            visitId,
+            medicationName: created.medicationName,
+            dosage: created.dosage,
+            quantity: created.quantity,
+          },
+        },
+      });
+
+      return created;
+    });
+
+    res.status(201).json({
+      success: true,
+      data: prescription,
+    });
+  }
+);
+
+
+
 // PATCH /api/visits/:id/treatments/:treatmentId
 // Update a treatment
 router.patch(
@@ -506,6 +733,267 @@ router.delete(
 
     res.json({
       message: 'Treatment deleted successfully',
+    });
+  }
+);
+
+router.post(
+  '/:id/treatments/from-service',
+  requireAuth,
+  requireRole(
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.DENTIST,
+  ),
+  validateBody(addTreatmentFromServiceSchema),
+  async (req, res) => {
+    const visitId = Array.isArray(req.params.id)
+      ? req.params.id[0]
+      : req.params.id;
+
+    if (!visitId) {
+      throw new AppError(400, 'Invalid visit ID');
+    }
+
+    const { serviceId, quantity } =
+      addTreatmentFromServiceSchema.parse(req.body);
+
+    const userId = res.locals.userId;
+    const userRole = res.locals.userRole;
+
+    if (!userId) {
+      throw new AppError(401, 'Authentication required');
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const visit = await tx.visit.findUnique({
+        where: { id: visitId },
+        select: {
+          id: true,
+          status: true,
+          doctorId: true,
+        },
+      });
+
+      if (!visit) {
+        throw new AppError(404, 'Visit not found');
+      }
+
+      if (visit.status !== VisitStatus.IN_PROGRESS) {
+        throw new AppError(400, 'Only active visits can be modified');
+      }
+
+      if (userRole === UserRole.DENTIST) {
+        const doctor = await tx.doctor.findUnique({
+          where: { userId },
+          select: { id: true },
+        });
+
+        if (!doctor || visit.doctorId !== doctor.id) {
+          throw new AppError(
+            403,
+            'You cannot modify another dentist’s visit',
+          );
+        }
+      }
+
+      const service = await tx.service.findFirst({
+        where: {
+          id: serviceId,
+          isActive: true,
+        },
+      });
+
+      if (!service) {
+        throw new AppError(
+          404,
+          'Active service not found',
+        );
+      }
+
+      const treatment = await tx.visitTreatment.create({
+        data: {
+          visitId,
+          serviceId: service.id,
+          name: service.name,
+          description: service.description,
+          quantity,
+          unitCost: service.price,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: 'VISIT_TREATMENT_ADDED',
+          entityType: 'VISIT_TREATMENT',
+          entityId: treatment.id,
+          details: {
+            visitId,
+            serviceId: service.id,
+            serviceName: service.name,
+            quantity,
+            unitCost: service.price.toString(),
+          },
+        },
+      });
+
+      return treatment;
+    });
+
+    res.status(201).json({
+      message: 'Treatment added successfully',
+      treatment: result,
+    });
+  },
+);
+
+router.get(
+  '/:id/prescriptions',
+  requireAuth,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.DENTIST),
+  async (req, res) => {
+    const visitId = Array.isArray(req.params.id)
+      ? req.params.id[0]
+      : req.params.id;
+
+    if (!visitId) {
+      throw new AppError(400, 'Invalid visit ID');
+    }
+
+    const visit = await prisma.visit.findUnique({
+      where: { id: visitId },
+      select: {
+        id: true,
+        doctorId: true,
+      },
+    });
+
+    if (!visit) {
+      throw new AppError(404, 'Visit not found');
+    }
+
+    if (req.user!.role === UserRole.DENTIST) {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: {
+          doctorProfile: {
+            select: { id: true },
+          },
+        },
+      });
+
+      if (
+        !user?.doctorProfile ||
+        visit.doctorId !== user.doctorProfile.id
+      ) {
+        throw new AppError(403, 'Access denied');
+      }
+    }
+
+    const prescriptions = await prisma.prescription.findMany({
+      where: { visitId },
+      include: {
+        prescribedBy: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: { prescribedAt: 'desc' },
+    });
+
+    res.json({
+      success: true,
+      data: prescriptions,
+    });
+  }
+);
+
+
+router.get(
+  '/patient/:patientId/prescriptions',
+  requireAuth,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.DENTIST),
+  async (req, res) => {
+    const patientId = Array.isArray(req.params.patientId)
+      ? req.params.patientId[0]
+      : req.params.patientId;
+
+    if (!patientId) {
+      throw new AppError(400, 'Invalid patient ID');
+    }
+
+    const patient = await prisma.patient.findUnique({
+      where: { id: patientId },
+      select: { id: true, name: true },
+    });
+
+    if (!patient) {
+      throw new AppError(404, 'Patient not found');
+    }
+
+    let doctorId: string | undefined;
+
+    if (req.user!.role === UserRole.DENTIST) {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: {
+          doctorProfile: {
+            select: { id: true },
+          },
+        },
+      });
+
+      if (!user?.doctorProfile) {
+        throw new AppError(403, 'Doctor profile not found');
+      }
+
+      doctorId = user.doctorProfile.id;
+    }
+
+    const prescriptions = await prisma.prescription.findMany({
+      where: {
+        visit: {
+          is: {
+            patientId,
+            ...(doctorId ? { doctorId } : {}),
+          },
+        },
+      },
+      include: {
+        prescribedBy: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        visit: {
+          select: {
+            id: true,
+            visitDate: true,
+            diagnosis: true,
+            doctor: {
+              select: {
+                id: true,
+                name: true,
+                specialization: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { prescribedAt: 'desc' },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        patient,
+        total: prescriptions.length,
+        prescriptions,
+      },
     });
   }
 );

@@ -10,7 +10,9 @@ import patientRouter from '../modules/patients/patient.routes.js';
 import visitRouter from '../modules/visit/visit.routes.js';
 import userRouter from '../modules/users/user.routes.js';
 import doctorDocumentRouter from '../modules/doctors/doctor-document.routes.js';
-
+import invoiceRoutes from '../modules/invoices/invoice.route.js';
+import financialReportRoutes from '../modules/reports/financial-report.routes.js';
+import dashboardRoutes from '../modules/dashboard/dashboard.routes.js';
 
 const router = Router();
 
@@ -27,6 +29,8 @@ router.use('/gallery', galleryRouter);
 router.use('/visits', visitRouter);
 router.use('/users', userRouter);
 router.use('/doctor-documents', doctorDocumentRouter);
-
+router.use('/invoices', invoiceRoutes);
+router.use('/reports', financialReportRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 export default router

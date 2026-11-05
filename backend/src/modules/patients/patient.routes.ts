@@ -5,8 +5,11 @@ import { AppError } from '../../lib/AppError.js';
 import { validateBody, validateQuery } from '../../middleware/validation.middleware.js';
 import { requireAuth } from '../../middleware/auth.middleware.js';
 import { phoneSchema } from '../../lib/phone.js';
-import { UserRole } from '@prisma/client';
+import { UserRole} from '@prisma/client';
 import { requireRole } from '../../middleware/requireRole.js';
+import { buildPatientStatement } from './patient-statement.service.js';
+import { generatePatientStatementPDF } from './patient-statement.pdf.js';
+
 
 const router = Router();
 
@@ -43,6 +46,46 @@ function getPatientId(value: string | string[] | undefined): string {
 
   return id;
 }
+
+const financialStatementQuerySchema = z.object({
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+}).refine(
+  ({ from, to }) => !from || !to || from <= to,
+  { message: '`from` must not be after `to`' }
+);
+
+function ethiopianDateBoundary(value: string): Date {
+  const parts = value.split('-');
+
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+
+  if (
+    parts.length !== 3 ||
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day)
+  ) {
+    throw new AppError(400, `Invalid date: ${value}`);
+  }
+
+  const calendarDate = new Date(
+    Date.UTC(year, month - 1, day)
+  );
+
+  if (
+    calendarDate.getUTCFullYear() !== year ||
+    calendarDate.getUTCMonth() !== month - 1 ||
+    calendarDate.getUTCDate() !== day
+  ) {
+    throw new AppError(400, `Invalid date: ${value}`);
+  }
+
+  return new Date(`${value}T00:00:00+03:00`);
+}
+
 
 // POST /api/patients
 router.post(
@@ -150,5 +193,77 @@ router.patch('/:id', requireAuth, requireRole(UserRole.ADMIN, UserRole.RECEPTION
 
   res.json(patient);
 });
+
+
+// GET /api/patients/:patientId/financial-statement
+router.get(
+  '/:patientId/financial-statement',
+  requireAuth,
+  requireRole(
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.RECEPTIONIST
+  ),
+  validateQuery(financialStatementQuerySchema),
+  async (req, res) => {
+    const patientId = getPatientId(req.params.patientId);
+    const { from, to } = res.locals.query as z.infer<
+      typeof financialStatementQuerySchema
+    >;
+
+    const statement = await buildPatientStatement(
+      patientId,
+      from,
+      to
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...statement,
+        transactionCount: statement.transactions.length,
+      },
+    });
+  }
+);
+
+// GET /api/patients/:patientId/financial-statement/pdf
+router.get(
+  '/:patientId/financial-statement/pdf',
+  requireAuth,
+  requireRole(
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.RECEPTIONIST
+  ),
+  validateQuery(financialStatementQuerySchema),
+  async (req, res) => {
+    const patientId = getPatientId(req.params.patientId);
+    const { from, to } = res.locals.query as z.infer<
+      typeof financialStatementQuerySchema
+    >;
+
+    const statement = await buildPatientStatement(
+      patientId,
+      from,
+      to
+    );
+
+    const pdf = generatePatientStatementPDF(statement);
+
+    const safePatientName = statement.patient.name
+      .replace(/[^a-zA-Z0-9-_]/g, '_');
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="patient-statement-${safePatientName}.pdf"`
+    );
+
+    pdf.pipe(res);
+    pdf.end();
+  }
+);
+
 
 export default router;
