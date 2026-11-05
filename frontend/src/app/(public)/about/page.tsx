@@ -94,7 +94,7 @@ export default async function AboutPage() {
 
           {/* Right Column: Dynamic Auto-changing Gallery Rotator */}
           <div className="relative">
-            <ImageRotator images={gallery} intervalMs={4500} />
+            <ImageRotator images={gallery} intervalMs={5_000} />
             
             {/* Accent Floating Badge */}
             <div className="absolute -bottom-6 -left-6 hidden sm:flex items-center gap-3 rounded-2xl bg-white p-4 shadow-xl border border-terracotta-100 z-30">

@@ -34,7 +34,15 @@ router.get('/', async (_req, res) => {
     await prisma.service.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
-      select: { id: true, name: true, slug: true, shortDescription: true, imageUrl: true, duration: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        shortDescription: true,
+        description: true,
+        imageUrl: true,
+        duration: true,
+      },
     }),
   );
 });

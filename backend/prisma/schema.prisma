@@ -9,7 +9,47 @@ datasource db {
 enum AppointmentStatus {
   PENDING
   CONFIRMED
+  CHECKED_IN
+  COMPLETED
   CANCELLED
+  NO_SHOW
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+}
+
+enum DoctorDocumentType {
+  PROFESSIONAL_LICENSE
+  EDUCATION_CERTIFICATE
+  SPECIALTY_CERTIFICATE
+  IDENTITY_DOCUMENT
+  EMPLOYMENT_AGREEMENT
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  RECEPTIONIST
+  DENTIST
+}
+
+enum VisitStatus {
+  IN_PROGRESS
   COMPLETED
 }
 
@@ -20,106 +60,288 @@ enum MessageStatus {
 }
 
 model User {
-  id           String   @id @default(uuid())
+  id           String @id @default(uuid())
   name         String
-  email        String   @unique
+  email        String @unique
   passwordHash String
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  role                       UserRole                @default(RECEPTIONIST)
+  appointmentAssignmentsMade AppointmentAssignment[] @relation("AppointmentAssignmentActor")
+
+  doctorProfile           Doctor?
+  auditLogs               AuditLog[]
+  isActive                Boolean          @default(true)
+  uploadedDoctorDocuments DoctorDocument[] @relation("DoctorDocumentUploader")
+  reviewedDoctorDocuments DoctorDocument[] @relation("DoctorDocumentReviewer")
+  verifiedDoctors         Doctor[]         @relation("DoctorVerifier")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Patient {
+  id      String  @id @default(uuid())
+  name    String
+  phone   String
+  email   String?
+  address String?
+
+  appointments Appointment[]
+  visits       Visit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([phone])
+  @@index([email])
 }
 
 model Service {
-  id               String        @id @default(uuid())
+  id               String  @id @default(uuid())
   name             String
-  slug             String        @unique
-  shortDescription  String?
+  slug             String  @unique
+  shortDescription String?
   description      String
   imageUrl         String?
   duration         Int?
-  isActive         Boolean       @default(true)
+  isActive         Boolean @default(true)
 
-  appointments     Appointment[]
+  appointments Appointment[]
 
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Doctor {
-  id             String   @id @default(uuid())
-  name           String
-  specialization String
-  education      String?
-  experience     String?
-  imageUrl       String?
-  isActive       Boolean  @default(true)
+  id     String  @id @default(uuid())
+  name   String
+  phone  String?
+  gender Gender?
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  specialization    String
+  education         String?
+  experience        String?
+  appointments      Appointment[]
+  licenseNumber     String?
+  licenseAuthority  String?
+  licenseExpiryDate DateTime?
+
+  employmentStartDate DateTime?
+  employmentType      EmploymentType @default(FULL_TIME)
+
+  imageUrl  String?
+  bio       String?
+  languages String[]
+
+  isActive    Boolean @default(true)
+  isPublished Boolean @default(false)
+  isVerified  Boolean @default(false)
+
+  verifiedAt   DateTime?
+  verifiedById String?
+  verifiedBy   User?     @relation("DoctorVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  documents              DoctorDocument[]
+  appointmentAssignments AppointmentAssignment[]
+  visits                 Visit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, isPublished])
+  @@index([isVerified])
+  @@index([name])
+  @@index([phone])
+}
+
+model DoctorDocument {
+  id String @id @default(uuid())
+
+  doctorId String
+  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+
+  documentType     DoctorDocumentType
+  fileUrl          String
+  originalFileName String?
+  mimeType         String?
+  fileSize         Int?
+
+  status          DocumentStatus @default(PENDING)
+  rejectionReason String?
+
+  uploadedById String
+  uploadedBy   User   @relation("DoctorDocumentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  reviewedById String?
+  reviewedBy   User?   @relation("DoctorDocumentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  uploadedAt DateTime  @default(now())
+  reviewedAt DateTime?
+
+  @@index([doctorId])
+  @@index([status])
+  @@index([documentType])
 }
 
 model Appointment {
-  id              String            @id @default(uuid())
+  id String @id @default(uuid())
 
-  patientName     String
-  phone           String
-  email           String?
+  patientName String
+  phone       String
+  email       String?
 
   appointmentDate DateTime
   message         String?
 
-  status          AppointmentStatus @default(PENDING)
+  status            AppointmentStatus       @default(PENDING)
+  assignmentHistory AppointmentAssignment[]
 
-  serviceId       String
-  service         Service           @relation(fields: [serviceId], references: [id])
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id])
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  patientId String?
+  patient   Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  visit     Visit?
+  doctorId  String?
+  doctor    Doctor?  @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([serviceId])
   @@index([status])
+  @@index([doctorId])
   @@index([appointmentDate])
+  @@index([patientId])
 }
 
 model Message {
-  id          String        @id @default(uuid())
-  name        String
-  phone       String?
-  email       String
-  subject     String?
-  message     String
-  status      MessageStatus @default(UNREAD)
-  deletedAt   DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id        String        @id @default(uuid())
+  name      String
+  phone     String?
+  email     String
+  subject   String?
+  message   String
+  status    MessageStatus @default(UNREAD)
+  deletedAt DateTime?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
-   @@index([deletedAt])
+  @@index([deletedAt])
 }
 
 model Testimonial {
-  id          String   @id @default(uuid())
+  id String @id @default(uuid())
 
   patientName String
   content     String
   rating      Int
   service     String?
-  isPublished Boolean  @default(false)
+  isPublished Boolean @default(false)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isPublished])
 }
 
 model GalleryImage {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   title       String?
   imageUrl    String
   category    String?
-  isPublished Boolean  @default(true)
+  isPublished Boolean @default(true)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isPublished])
+}
+
+model Visit {
+  id String @id @default(uuid())
+
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  doctorId String?
+  doctor   Doctor? @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+
+  diagnosis String?
+  notes     String?
+  visitDate DateTime @default(now())
+
+  treatments VisitTreatment[]
+  status     VisitStatus      @default(IN_PROGRESS)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([visitDate])
+  @@index([status])
+}
+
+model VisitTreatment {
+  id String @id @default(uuid())
+
+  visitId String
+  visit   Visit  @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  quantity    Int     @default(1)
+  unitCost    Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([visitId])
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  action     String
+  entityType String
+  entityId   String?
+
+  details Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model AppointmentAssignment {
+  id String @id @default(uuid())
+
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+
+  doctorId String
+  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+
+  assignedById String
+  assignedBy   User   @relation("AppointmentAssignmentActor", fields: [assignedById], references: [id], onDelete: Restrict)
+
+  reason     String?
+  assignedAt DateTime @default(now())
+
+  @@index([appointmentId])
+  @@index([doctorId])
+  @@index([assignedById])
+  @@index([assignedAt])
 }

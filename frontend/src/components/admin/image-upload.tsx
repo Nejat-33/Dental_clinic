@@ -38,7 +38,6 @@ export function ImageUpload({ value, onChange }: Props) {
     <div className="flex items-center gap-4">
       <div className="relative grid size-24 shrink-0 place-items-center overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
         {value ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img src={value} alt="" className="size-full object-cover" />
         ) : (
           <ImagePlus className="size-8 text-slate-400" />

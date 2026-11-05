@@ -8,3 +8,9 @@ export const getService = (slug: string) => api<Service>(`/services/${slug}`, re
 export const getDoctors = () => api<Doctor[]>('/doctors', revalidate);
 export const getTestimonials = () => api<Testimonial[]>('/testimonials', revalidate);
 export const getGallery = () => api<GalleryImage[]>('/gallery', revalidate);
+
+
+
+
+
+

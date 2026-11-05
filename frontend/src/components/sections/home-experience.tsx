@@ -1,14 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import NextImage from 'next/image';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown,
-  ArrowLeft,
-  ArrowRight,
   ArrowUpRight,
-  BadgeCheck,
   CalendarDays,
   ChevronDown,
   ChevronLeft,
@@ -19,11 +15,13 @@ import {
   Plus,
   Sparkles,
   Star,
-  Stethoscope,
 } from 'lucide-react';
 import { site } from '@/config/site';
 import { BookingForm } from '@/components/forms/booking-form';
 import { BeforeAfterSlider, type SmileTransformation } from '@/components/sections/before-after-slider';
+import ServiceExpander from '@/components/sections/service-expander';
+import SmileEstimator from '@/components/sections/smile-estimator';
+import SpecialistsCarousel from '@/components/sections/specialists-carousel';
 import type { Doctor, GalleryImage, Service, Testimonial } from '@/types/api';
 
 type Props = {
@@ -32,34 +30,6 @@ type Props = {
   testimonials: Testimonial[];
   gallery: GalleryImage[];
 };
-
-const serviceOptions = [
-  {
-    title: 'Aesthetic dentistry',
-    description: 'Subtle, considered enhancements that let your natural smile shine.',
-    keywords: ['aesthetic', 'cosmetic', 'veneer'],
-  },
-  {
-    title: 'Orthodontics',
-    description: 'Thoughtful alignment plans, from clear aligners to modern braces.',
-    keywords: ['orthodont', 'align', 'braces'],
-  },
-  {
-    title: 'Implantology',
-    description: 'Restore comfort and confidence with a carefully planned implant.',
-    keywords: ['implant', 'restor'],
-  },
-  {
-    title: 'Professional whitening',
-    description: 'A brighter smile with a plan tailored to your teeth and sensitivity.',
-    keywords: ['whiten', 'bleach'],
-  },
-  {
-    title: 'Surgical dentistry',
-    description: 'Expert-led procedures with comfort and recovery always in mind.',
-    keywords: ['surg', 'extract'],
-  },
-];
 
 const goals = [
   'Straighter teeth',
@@ -97,60 +67,17 @@ function isSeedPlaceholderImage(imageUrl: string | null | undefined) {
   return imageUrl?.startsWith('/images/') ?? false;
 }
 
-function yearsPracticing(experience: string | null) {
-  if (!experience) return 'Experienced clinician';
-
-  const duration = experience.match(/(\d+)\s*(\+?)\s*(?:years?|yrs?)/i);
-  if (duration) return `${duration[1]}${duration[2]} years practicing`;
-
-  const range = experience.match(/\b(19\d{2}|20\d{2})\s*[-–]\s*(19\d{2}|20\d{2})\b/);
-  if (range) return `${Math.max(1, Number(range[2]) - Number(range[1]))}+ years practicing`;
-
-  const startingYear = experience.match(/\b(?:since|from)\s+(19\d{2}|20\d{2})\b/i)?.[1];
-  if (startingYear) return `Practicing since ${startingYear}`;
-
-  return 'Experienced clinician';
-}
-
-function doctorRole(doctor: Doctor) {
-  return doctor.specialization || 'Dental specialist';
-}
-
-function initials(name: string) {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase();
-}
-
 export default function HomeExperience({ services, doctors, testimonials, gallery }: Props) {
-  const [activeService, setActiveService] = useState(0);
   const [goal, setGoal] = useState<(typeof goals)[number]>(goals[0]);
   const [method, setMethod] = useState<(typeof methods)[number]>(methods[0]);
   const [loyalty, setLoyalty] = useState<(typeof loyaltyPlans)[number]>(loyaltyPlans[0]);
   const [previewAngle, setPreviewAngle] = useState(0);
   const [heroIndex, setHeroIndex] = useState(0);
-  const doctorTrack = useRef<HTMLDivElement>(null);
 
   const availableGallery = useMemo(
     () => gallery.filter((image) => !isSeedPlaceholderImage(image.imageUrl)),
     [gallery],
   );
-
-  const serviceCards = useMemo(() => serviceOptions.map((option) => {
-    const match = services.find((service) => option.keywords.some((word) => service.name.toLowerCase().includes(word)));
-    return {
-      ...option,
-      service: match,
-      image: match?.imageUrl && !isSeedPlaceholderImage(match.imageUrl)
-        ? match.imageUrl
-        : availableGallery[0]?.imageUrl ?? '/smile-illustration.svg',
-      description: match?.shortDescription || match?.description || option.description,
-    };
-  }), [availableGallery, services]);
 
   const heroImages = useMemo(() => {
     const images = availableGallery.length ? availableGallery : services
@@ -197,7 +124,7 @@ export default function HomeExperience({ services, doctors, testimonials, galler
     if (heroImages.length < 2) return;
     const interval = window.setInterval(() => {
       setHeroIndex((current) => (current + 1) % heroImages.length);
-    }, 60_000);
+    }, 5_000);
     return () => window.clearInterval(interval);
   }, [heroImages.length]);
 
@@ -260,10 +187,6 @@ export default function HomeExperience({ services, doctors, testimonials, galler
     return { min, max, time, complexity, specialist, methodNote };
   }, [goal, method]);
 
-  function moveDoctors(direction: -1 | 1) {
-    doctorTrack.current?.scrollBy({ left: direction * 360, behavior: 'smooth' });
-  }
-
   return (
     <>
         <section id="about" className="scroll-mt-24 px-5 pb-20 pt-10 sm:px-8 sm:pb-28 sm:pt-16 lg:px-12 lg:pt-20">
@@ -281,13 +204,13 @@ export default function HomeExperience({ services, doctors, testimonials, galler
                 Luxury care, made personal. Thoughtful dentistry for the smile you have — and the one you imagine.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
-                <a href="#booking" className="group inline-flex items-center gap-3 rounded-full bg-[#2c1d18] px-6 py-4 text-sm font-semibold text-white transition hover:bg-[#49332b]">
-                  <CalendarDays className="size-4" />
-                  Schedule a visit
-                  <ArrowUpRight className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                <a href="#services" className="group inline-flex items-center gap-3 rounded-full bg-[#2c1d18] px-6 py-4 text-sm font-semibold text-white transition hover:bg-[#49332b]">
+                  Explore treatments
+                  <ArrowDown className="size-4 transition-transform group-hover:translate-y-0.5" />
                 </a>
-                <a href="#services" className="inline-flex items-center gap-2 rounded-full px-5 py-4 text-sm font-medium text-[#6e5c54] transition hover:bg-white/70">
-                  Discover our care <ArrowDown className="size-3.5" />
+                <a href="#booking" className="inline-flex items-center gap-2 rounded-full border border-[#d57f6d] bg-[#fdf7f5] px-5 py-4 text-sm font-semibold text-[#9b5b4d] transition hover:bg-[#d57f6d] hover:text-white">
+                  <CalendarDays className="size-4" />
+                  Book Appointment
                 </a>
               </div>
               <div className="mt-12 flex items-center gap-4 border-t border-[#e9ddd7] pt-6">
@@ -363,122 +286,24 @@ export default function HomeExperience({ services, doctors, testimonials, galler
 
         <section id="services" className="scroll-mt-20 bg-[#faf0eb] px-5 py-20 sm:px-8 sm:py-24 lg:px-12">
           <div className="mx-auto max-w-[1440px]">
-            <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#a66e5e]">Care, thoughtfully considered</p>
-                <h2 className="mt-4 max-w-xl font-serif text-4xl leading-tight tracking-[-0.04em] sm:text-5xl">Expert care for every smile.</h2>
-              </div>
-              <Link href="/services" className="inline-flex items-center gap-2 pb-1 text-xs font-semibold text-[#6c544b] transition hover:text-[#d57f6d]">
-                Explore all services <ArrowUpRight className="size-4" />
-              </Link>
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#a66e5e]">Services</p>
+              <h2 className="mt-4 font-serif text-4xl leading-tight tracking-[-0.04em] text-[#2c1d18] sm:text-5xl">Expert care for every smile</h2>
+              <p className="mx-auto mt-4 max-w-lg text-sm leading-6 text-[#817068]">Personalized treatments, considered in every detail and shaped around what matters to you.</p>
             </div>
-
-            <div className="mt-10 grid gap-3 lg:grid-cols-6">
-              {serviceCards.map((service, index) => (
-                <button
-                  key={service.title}
-                  type="button"
-                  onMouseEnter={() => setActiveService(index)}
-                  onFocus={() => setActiveService(index)}
-                  onClick={() => setActiveService(index)}
-                  aria-expanded={activeService === index}
-                  className={`group min-h-[150px] rounded-2xl border p-5 text-left transition-all duration-300 sm:p-6 ${activeService === index ? 'border-[#d57f6d] bg-[#d57f6d] text-white shadow-xl shadow-[#a05f4f]/15 lg:col-span-2' : 'border-[#e8d8d0] bg-[#fdf7f5]/75 hover:-translate-y-1 hover:bg-white lg:col-span-1'}`}
-                >
-                  <span className={`mb-7 grid size-9 place-items-center rounded-full ${activeService === index ? 'bg-white/20' : 'bg-[#f0dfd7] text-[#b36f5d]'}`}>
-                    <Stethoscope className="size-4" />
-                  </span>
-                  <span className="flex items-center justify-between gap-2 text-sm font-semibold">
-                    {service.title}
-                    <ArrowUpRight className={`size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 ${activeService === index ? 'text-white' : 'text-[#b77b69]'}`} />
-                  </span>
-                  {activeService === index && <span className="mt-2 block max-w-xs text-xs leading-5 text-white/80">{service.description}</span>}
-                </button>
-              ))}
-            </div>
-            <div className="mt-5 grid overflow-hidden rounded-[1.75rem] bg-[#2c1d18] text-white md:grid-cols-[0.9fr_1.1fr]">
-              <div className="flex flex-col justify-between p-7 sm:p-10">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-[#e2a99a]">Selected care</p>
-                  <h3 className="mt-4 font-serif text-3xl tracking-tight sm:text-4xl">{serviceCards[activeService]?.title}</h3>
-                  <p className="mt-4 max-w-md text-sm leading-6 text-white/65">{serviceCards[activeService]?.description}</p>
-                </div>
-                <Link
-                  href={serviceCards[activeService]?.service ? `/services/${serviceCards[activeService].service.slug}` : '/services'}
-                  className="mt-8 inline-flex w-fit items-center gap-3 rounded-full border border-white/25 px-5 py-3 text-xs font-semibold transition hover:border-[#d57f6d] hover:bg-[#d57f6d]"
-                >
-                  Discover this treatment <ArrowRight className="size-3.5" />
-                </Link>
-              </div>
-              <div className="relative min-h-[240px] overflow-hidden bg-[#ad7966] sm:min-h-[320px]">
-                <NextImage src={serviceCards[activeService]?.image ?? '/smile-illustration.svg'} alt={`${serviceCards[activeService]?.title} preview`} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover opacity-85 transition-transform duration-700 hover:scale-[1.03]" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#2c1d18]/50 to-transparent" />
-                <span className="absolute bottom-5 left-6 rounded-full border border-white/35 bg-[#2c1d18]/25 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-white backdrop-blur">Personalised treatment planning</span>
-              </div>
+            <ServiceExpander services={services} />
+            <div className="mt-8 text-center">
+              <a href="#booking" className="inline-flex items-center gap-2 rounded-full bg-[#d57f6d] px-7 py-4 text-xs font-semibold text-white transition hover:bg-[#bd6858]">
+                Schedule a visit <CalendarDays className="size-4" />
+              </a>
             </div>
           </div>
         </section>
 
         <section id="specialists" className="scroll-mt-20 px-5 py-20 sm:px-8 sm:py-24 lg:px-12">
           <div className="mx-auto max-w-[1440px]">
-            <div className="flex flex-wrap items-end justify-between gap-5">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#a66e5e]">Your care, in good hands</p>
-                <h2 className="mt-4 max-w-xl font-serif text-4xl leading-tight tracking-[-0.04em] sm:text-5xl">Meet the minds behind your smile.</h2>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="hidden -space-x-3 sm:flex" aria-label="Meet our specialist team">
-                  {doctors.slice(0, 3).map((doctor) => (
-                    <span key={doctor.id} className="grid size-10 place-items-center overflow-hidden rounded-full border-2 border-[#fdf7f5] bg-[#eadbd3] text-[10px] font-semibold text-[#6d5147]">
-                      {doctor.imageUrl && !isSeedPlaceholderImage(doctor.imageUrl) ? <NextImage src={doctor.imageUrl} alt="" width={40} height={40} className="size-full object-cover" /> : initials(doctor.name)}
-                    </span>
-                  ))}
-                  <span className="grid size-10 place-items-center rounded-full border-2 border-[#fdf7f5] bg-[#d57f6d] text-[10px] font-semibold text-white">+14</span>
-                </div>
-                <Link href="/doctors" className="inline-flex items-center gap-2 rounded-full border border-[#e7d8d1] px-5 py-3 text-xs font-semibold transition hover:border-[#d57f6d] hover:text-[#b96757]">
-                  View all specialists <ArrowUpRight className="size-3.5" />
-                </Link>
-              </div>
-            </div>
-            <div ref={doctorTrack} className="mt-10 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {doctors.length ? doctors.map((doctor) => (
-                <article key={doctor.id} className="group w-[min(82vw,320px)] shrink-0 snap-start overflow-hidden rounded-[1.5rem] border border-[#ecdfd9] bg-white/70 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#5b3b2e]/10">
-                  <div className="relative aspect-[0.95/1] overflow-hidden bg-[#eadbd3]">
-                    {doctor.imageUrl && !isSeedPlaceholderImage(doctor.imageUrl) ? (
-                      <NextImage src={doctor.imageUrl} alt={doctor.name} fill sizes="320px" className="object-cover transition-transform duration-700 group-hover:scale-105" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#eadbd3] via-[#d8b8a8] to-[#b98270]">
-                        <span className="grid size-24 place-items-center rounded-full border border-white/60 bg-white/20 text-2xl font-serif text-white backdrop-blur">{initials(doctor.name)}</span>
-                      </div>
-                    )}
-                    <span className="absolute left-4 top-4 rounded-full border border-white/60 bg-[#fdf7f5]/85 px-3 py-2 text-[10px] font-semibold text-[#6a5148] backdrop-blur">{doctorRole(doctor)}</span>
-                  </div>
-                  <div className="p-5">
-                    <h3 className="font-serif text-2xl tracking-tight">{doctor.name}</h3>
-                    <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-[#817068]">{doctor.bio || `Focused on ${doctorRole(doctor).toLowerCase()} and care that feels personal.`}</p>
-                    <div className="mt-5 flex items-center justify-between border-t border-[#eee2dc] pt-4 text-[10px] text-[#8a7770]">
-                      <span className="inline-flex items-center gap-1.5"><BadgeCheck className="size-3.5 text-[#c28866]" /> {yearsPracticing(doctor.experience)}</span>
-                      <Link href="/doctors" aria-label={`Learn more about ${doctor.name}`} className="grid size-8 place-items-center rounded-full bg-[#faf0eb] text-[#8e5e4d] transition group-hover:bg-[#d57f6d] group-hover:text-white"><ArrowUpRight className="size-3.5" /></Link>
-                    </div>
-                  </div>
-                </article>
-              )) : (
-                <div className="flex min-h-[280px] w-full items-center justify-between gap-8 rounded-[1.5rem] border border-[#ecdfd9] bg-white/70 p-8 sm:p-12">
-                  <div className="max-w-lg">
-                    <span className="grid size-12 place-items-center rounded-full bg-[#faf0eb] text-[#c28866]"><Stethoscope className="size-5" /></span>
-                    <h3 className="mt-5 font-serif text-3xl">A team shaped around you.</h3>
-                    <p className="mt-3 text-sm leading-6 text-[#817068]">Our specialists will help you find the right care for your smile. Meet the team and explore each clinician&apos;s expertise.</p>
-                    <Link href="/doctors" className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-[#b96757]">Meet our specialists <ArrowRight className="size-3.5" /></Link>
-                  </div>
-                  <div className="hidden size-44 shrink-0 items-center justify-center rounded-full bg-[#faf0eb] sm:flex"><Heart className="size-12 text-[#d57f6d]" strokeWidth={1} /></div>
-                </div>
-              )}
-            </div>
-            {doctors.length > 1 && (
-              <div className="mt-5 flex justify-end gap-2">
-                <button type="button" onClick={() => moveDoctors(-1)} aria-label="Previous specialists" className="grid size-10 place-items-center rounded-full border border-[#e7d8d1] transition hover:bg-[#2c1d18] hover:text-white"><ArrowLeft className="size-4" /></button>
-                <button type="button" onClick={() => moveDoctors(1)} aria-label="Next specialists" className="grid size-10 place-items-center rounded-full border border-[#e7d8d1] transition hover:bg-[#2c1d18] hover:text-white"><ArrowRight className="size-4" /></button>
-              </div>
-            )}
+            <SpecialistsCarousel doctors={doctors} />
+            <SmileEstimator />
           </div>
         </section>
 
@@ -568,7 +393,7 @@ export default function HomeExperience({ services, doctors, testimonials, galler
           </div>
         </section>
 
-        <BeforeAfterSlider cases={transformations} testimonials={testimonials} />
+        <BeforeAfterSlider cases={transformations} testimonials={testimonials} gallery={availableGallery} />
 
         <section id="booking" className="scroll-mt-20 bg-[#faf0eb] px-5 py-20 sm:px-8 sm:py-24 lg:px-12">
           <div className="mx-auto max-w-[1440px]">

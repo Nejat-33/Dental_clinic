@@ -10,7 +10,7 @@ interface ImageRotatorProps {
   intervalMs?: number;
 }
 
-export function ImageRotator({ images, intervalMs = 60_000 }: ImageRotatorProps) {
+export function ImageRotator({ images, intervalMs = 5_000 }: ImageRotatorProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {

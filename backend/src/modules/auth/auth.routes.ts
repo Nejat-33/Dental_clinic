@@ -36,13 +36,32 @@ router.post('/login', loginLimiter, validateBody(loginSchema), async (_req, res)
   const { email, password } = res.locals.body as z.infer<typeof loginSchema>;
 
   const user = await prisma.user.findUnique({ where: { email } });
-  const valid = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
-  if (!user || !valid) throw new AppError(401, 'Invalid email or password');
 
-  const token = jwt.sign({}, env.JWT_SECRET, { subject: user.id, expiresIn: '7d' });
+  const valid = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
+
+  if (!user || !valid) {
+    throw new AppError(401, 'Invalid email or password');
+  }
+
+  if (!user.isActive) {
+    throw new AppError(403, 'Your account has been deactivated. Contact the administrator.');
+  }
+
+  const token = jwt.sign({}, env.JWT_SECRET, {
+    subject: user.id,
+    expiresIn: '7d',
+  });
+
   res.cookie('token', token, cookieOptions);
-  res.json({ id: user.id, name: user.name, email: user.email });
+
+  res.json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+  });
 });
+
 
 router.post('/logout', (_req, res) => {
   res.clearCookie('token', { ...cookieOptions, maxAge: undefined });

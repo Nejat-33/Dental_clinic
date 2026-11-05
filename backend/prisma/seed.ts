@@ -11,6 +11,112 @@ const adapter = new PrismaPg({
 
 const prisma = new PrismaClient({ adapter });
 
+const serviceImages = [
+  {
+    slug: "general-dentistry",
+    imageUrl:
+      "https://res.cloudinary.com/njpx3tyn/image/upload/v1793197273/images.jpg",
+  },
+  {
+    slug: "teeth-cleaning",
+    imageUrl:
+      "https://res.cloudinary.com/njpx3tyn/image/upload/v1793197240/images_3.jpg",
+  },
+  {
+    slug: "dental-filling",
+    imageUrl:
+      "https://res.cloudinary.com/njpx3tyn/image/upload/v1793197285/images_2.jpg",
+  },
+  {
+    slug: "teeth-whitening",
+    imageUrl:
+      "https://res.cloudinary.com/njpx3tyn/image/upload/v1793197308/images_5.jpg",
+  },
+  {
+    slug: "root-canal-treatment",
+    imageUrl:
+      "https://res.cloudinary.com/njpx3tyn/image/upload/v1793197297/images_4.jpg",
+  },
+] satisfies Array<{ slug: string; imageUrl: string }>;
+
+const doctorImages = [
+  {
+    name: "Dr. Ahmed Hassan",
+    imageUrl:
+      "https://res.cloudinary.com/njpx3tyn/image/upload/v1793172804/photo-1582750433449-648ed127bb54.avif",
+  },
+  {
+    name: "Dr. Sara Mohammed",
+    imageUrl:
+      "https://res.cloudinary.com/njpx3tyn/image/upload/v1793172828/photo-1559839734-2b71ea197ec2.avif",
+  },
+  {
+    name: "Dr. Daniel Tesfaye",
+    imageUrl:
+      "https://res.cloudinary.com/njpx3tyn/image/upload/v1793172818/photo-1612349317150-e413f6a5b16d.avif",
+  },
+] satisfies Array<{ name: string; imageUrl: string }>;
+
+const galleryImages = [
+  {
+    title: "Modern Reception",
+    category: "Clinic",
+    isPublished: true,
+    imageUrl:
+      "https://res.cloudinary.com/njpx3tyn/image/upload/v1793196517/photo-1519494026892-80bbd2d6fd0d.avif",
+  },
+  {
+    title: "Treatment Room",
+    category: "Clinic",
+    isPublished: true,
+    imageUrl:
+      "https://res.cloudinary.com/njpx3tyn/image/upload/v1793172734/photo-1598256989800-fe5f95da9787.avif",
+  },
+  {
+    title: "Dental Equipment",
+    category: "Equipment",
+    isPublished: true,
+    imageUrl:
+      "https://res.cloudinary.com/njpx3tyn/image/upload/v1793172713/photo-1606811841689-23dfddce3e95.avif",
+  },
+  {
+    title: "Comfortable Waiting Area",
+    category: "Clinic",
+    isPublished: true,
+    imageUrl:
+      "https://res.cloudinary.com/njpx3tyn/image/upload/v1793196665/photo-1629909613654-28e377c37b09.avif",
+  },
+  {
+    title: "Our Dental Team",
+    category: "Team",
+    isPublished: true,
+    imageUrl:
+      "https://res.cloudinary.com/njpx3tyn/image/upload/v1793196761/Gemini_Generated_Image_3h4yf73h4yf73h4y.jpg",
+  },
+  {
+    title: "Patient Care",
+    category: "Treatment",
+    isPublished: false,
+    imageUrl:
+      "https://res.cloudinary.com/njpx3tyn/image/upload/v1793172713/photo-1606811841689-23dfddce3e95.avif",
+  },
+] satisfies Array<{
+  title: string;
+  category: string;
+  isPublished: boolean;
+  imageUrl: string;
+}>;
+
+function getImageUrl<T extends { imageUrl: string }>(
+  images: T[],
+  matches: (image: T) => boolean,
+) {
+  const image = images.find(matches);
+  if (!image) {
+    throw new Error("Missing image in seed configuration.");
+  }
+  return image.imageUrl;
+}
 
 
 async function main() {
@@ -36,7 +142,12 @@ async function main() {
   const services = await Promise.all([
     prisma.service.upsert({
       where: { slug: "general-dentistry" },
-      update: {},
+      update: {
+        imageUrl: getImageUrl(
+          serviceImages,
+          (image) => image.slug === "general-dentistry",
+        ),
+      },
       create: {
         name: "General Dentistry",
         slug: "general-dentistry",
@@ -45,14 +156,22 @@ async function main() {
         description:
           "Our general dentistry services focus on preventive care, diagnosis, and treatment of common dental conditions. We provide professional examinations and personalized treatment plans.",
         duration: 45,
-        imageUrl: "/images/services/general-dentistry.jpg",
+        imageUrl: getImageUrl(
+          serviceImages,
+          (image) => image.slug === "general-dentistry",
+        ),
         isActive: true,
       },
     }),
 
     prisma.service.upsert({
       where: { slug: "teeth-cleaning" },
-      update: {},
+      update: {
+        imageUrl: getImageUrl(
+          serviceImages,
+          (image) => image.slug === "teeth-cleaning",
+        ),
+      },
       create: {
         name: "Teeth Cleaning",
         slug: "teeth-cleaning",
@@ -61,14 +180,22 @@ async function main() {
         description:
           "Professional dental cleaning helps remove plaque and tartar that regular brushing may not completely eliminate. Our team provides careful cleaning and guidance for maintaining oral hygiene.",
         duration: 45,
-        imageUrl: "/images/services/teeth-cleaning.jpg",
+        imageUrl: getImageUrl(
+          serviceImages,
+          (image) => image.slug === "teeth-cleaning",
+        ),
         isActive: true,
       },
     }),
 
     prisma.service.upsert({
       where: { slug: "dental-filling" },
-      update: {},
+      update: {
+        imageUrl: getImageUrl(
+          serviceImages,
+          (image) => image.slug === "dental-filling",
+        ),
+      },
       create: {
         name: "Dental Filling",
         slug: "dental-filling",
@@ -77,14 +204,22 @@ async function main() {
         description:
           "Dental fillings restore teeth affected by decay and help prevent further damage. Our dentists examine the affected tooth and recommend an appropriate treatment.",
         duration: 60,
-        imageUrl: "/images/services/dental-filling.jpg",
+        imageUrl: getImageUrl(
+          serviceImages,
+          (image) => image.slug === "dental-filling",
+        ),
         isActive: true,
       },
     }),
 
     prisma.service.upsert({
       where: { slug: "teeth-whitening" },
-      update: {},
+      update: {
+        imageUrl: getImageUrl(
+          serviceImages,
+          (image) => image.slug === "teeth-whitening",
+        ),
+      },
       create: {
         name: "Teeth Whitening",
         slug: "teeth-whitening",
@@ -93,14 +228,22 @@ async function main() {
         description:
           "Our professional teeth whitening service is designed to improve the appearance of stained or discolored teeth while following appropriate dental care procedures.",
         duration: 60,
-        imageUrl: "/images/services/teeth-whitening.jpg",
+        imageUrl: getImageUrl(
+          serviceImages,
+          (image) => image.slug === "teeth-whitening",
+        ),
         isActive: true,
       },
     }),
 
     prisma.service.upsert({
       where: { slug: "root-canal-treatment" },
-      update: {},
+      update: {
+        imageUrl: getImageUrl(
+          serviceImages,
+          (image) => image.slug === "root-canal-treatment",
+        ),
+      },
       create: {
         name: "Root Canal Treatment",
         slug: "root-canal-treatment",
@@ -109,14 +252,17 @@ async function main() {
         description:
           "Root canal treatment addresses infection or inflammation inside a tooth. Our dentists evaluate the condition and develop an appropriate treatment plan.",
         duration: 90,
-        imageUrl: "/images/services/root-canal.jpg",
+        imageUrl: getImageUrl(
+          serviceImages,
+          (image) => image.slug === "root-canal-treatment",
+        ),
         isActive: true,
       },
     }),
 
     prisma.service.upsert({
       where: { slug: "dental-crowns" },
-      update: {},
+      update: { imageUrl: "/dental-crowns.jpg" },
       create: {
         name: "Dental Crowns",
         slug: "dental-crowns",
@@ -125,7 +271,7 @@ async function main() {
         description:
           "Dental crowns can help restore the shape, strength, and appearance of damaged teeth. Treatment begins with an examination and personalized recommendation.",
         duration: 90,
-        imageUrl: "/images/services/dental-crowns.jpg",
+        imageUrl: "/dental-crowns.jpg",
         isActive: true,
       },
     }),
@@ -137,40 +283,53 @@ async function main() {
   // 3. DOCTORS
   // --------------------------------------------------
 
-  const doctors = await Promise.all([
-    prisma.doctor.create({
-      data: {
-        name: "Dr. Ahmed Hassan",
-        specialization: "General & Restorative Dentistry",
-        education: "Doctor of Dental Medicine",
-        experience: "8+ years of clinical experience",
-        imageUrl: "/images/doctors/dr-ahmed.jpg",
-        isActive: true,
-      },
-    }),
+  const doctorData = [
+    {
+      name: "Dr. Ahmed Hassan",
+      specialization: "General & Restorative Dentistry",
+      education: "Doctor of Dental Medicine",
+      experience: "8+ years of clinical experience",
+      imageUrl: getImageUrl(
+        doctorImages,
+        (image) => image.name === "Dr. Ahmed Hassan",
+      ),
+      isActive: true,
+    },
+    {
+      name: "Dr. Sara Mohammed",
+      specialization: "Cosmetic Dentistry",
+      education: "Doctor of Dental Medicine",
+      experience: "6+ years of clinical experience",
+      imageUrl: getImageUrl(
+        doctorImages,
+        (image) => image.name === "Dr. Sara Mohammed",
+      ),
+      isActive: true,
+    },
+    {
+      name: "Dr. Daniel Tesfaye",
+      specialization: "Endodontics & Restorative Dentistry",
+      education: "Doctor of Dental Medicine",
+      experience: "10+ years of clinical experience",
+      imageUrl: getImageUrl(
+        doctorImages,
+        (image) => image.name === "Dr. Daniel Tesfaye",
+      ),
+      isActive: true,
+    },
+  ];
 
-    prisma.doctor.create({
-      data: {
-        name: "Dr. Sara Mohammed",
-        specialization: "Cosmetic Dentistry",
-        education: "Doctor of Dental Medicine",
-        experience: "6+ years of clinical experience",
-        imageUrl: "/images/doctors/dr-sara.jpg",
-        isActive: true,
-      },
+  const doctors = await Promise.all(
+    doctorData.map(async (data) => {
+      const existing = await prisma.doctor.updateMany({
+        where: { name: data.name },
+        data,
+      });
+      return existing.count > 0
+        ? prisma.doctor.findFirstOrThrow({ where: { name: data.name } })
+        : prisma.doctor.create({ data });
     }),
-
-    prisma.doctor.create({
-      data: {
-        name: "Dr. Daniel Tesfaye",
-        specialization: "Endodontics & Restorative Dentistry",
-        education: "Doctor of Dental Medicine",
-        experience: "10+ years of clinical experience",
-        imageUrl: "/images/doctors/dr-daniel.jpg",
-        isActive: true,
-      },
-    }),
-  ]);
+  );
 
   console.log(`✅ ${doctors.length} doctors created`);
 
@@ -233,49 +392,14 @@ async function main() {
   // 5. GALLERY
   // --------------------------------------------------
 
-  const galleryImages = [
-    {
-      title: "Modern Reception",
-      imageUrl: "/images/gallery/reception.jpg",
-      category: "Clinic",
-      isPublished: true,
-    },
-    {
-      title: "Treatment Room",
-      imageUrl: "/images/gallery/treatment-room.jpg",
-      category: "Clinic",
-      isPublished: true,
-    },
-    {
-      title: "Dental Equipment",
-      imageUrl: "/images/gallery/equipment.jpg",
-      category: "Equipment",
-      isPublished: true,
-    },
-    {
-      title: "Comfortable Waiting Area",
-      imageUrl: "/images/gallery/waiting-area.jpg",
-      category: "Clinic",
-      isPublished: true,
-    },
-    {
-      title: "Our Dental Team",
-      imageUrl: "/images/gallery/dental-team.jpg",
-      category: "Team",
-      isPublished: true,
-    },
-    {
-      title: "Patient Care",
-      imageUrl: "/images/gallery/patient-care.jpg",
-      category: "Treatment",
-      isPublished: false,
-    },
-  ];
-
   for (const image of galleryImages) {
-    await prisma.galleryImage.create({
+    const existing = await prisma.galleryImage.updateMany({
+      where: { title: image.title },
       data: image,
     });
+    if (existing.count === 0) {
+      await prisma.galleryImage.create({ data: image });
+    }
   }
 
   console.log(`✅ ${galleryImages.length} gallery images created`);
