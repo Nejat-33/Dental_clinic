@@ -1,5 +1,12 @@
 import { api } from '@/lib/api';
-import type { AdminDoctor, AdminService, Appointment, AppointmentListResponse } from '@/types/api';
+import type {
+  AdminDoctor,
+  AdminService,
+  Appointment,
+  AppointmentCalendarResponse,
+  AppointmentHistoryResponse,
+  AppointmentListResponse,
+} from '@/types/api';
 
 type AppointmentParams = {
   status?: string;
@@ -26,6 +33,13 @@ export function appointmentDetailQuery(id: string) {
   return {
     queryKey: ['appointments', 'detail', id] as const,
     queryFn: () => api<{ appointment: Appointment }>(`/appointments/${id}`),
+  };
+}
+
+export function appointmentHistoryQuery(id: string) {
+  return {
+    queryKey: ['appointments', 'history', id] as const,
+    queryFn: () => api<AppointmentHistoryResponse>(`/appointments/${id}/history`),
   };
 }
 

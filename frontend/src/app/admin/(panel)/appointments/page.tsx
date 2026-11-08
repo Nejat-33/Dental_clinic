@@ -13,6 +13,7 @@ import {
 } from '@/components/admin/appointments/appointment-filters';
 import { AppointmentTable } from '@/components/admin/appointments/appointment-table';
 import { AppointmentDetailModal } from '@/components/admin/appointments/appointment-detail-modal';
+import { AppointmentCreateModal } from '@/components/admin/appointments/appointment-create-modal';
 
 const LIMIT = 10;
 
@@ -20,6 +21,7 @@ export default function AppointmentsPage() {
   const [filters, setFilters] = useState<AppointmentFilters>(DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const search = useDebouncedValue(filters.search.trim());
 
@@ -60,6 +62,9 @@ export default function AppointmentsPage() {
             </p>
           )}
         </div>
+        <Button variant="primary" onClick={() => setCreateOpen(true)}>
+          New appointment
+        </Button>
       </div>
 
       <div className="mt-6">
@@ -107,6 +112,14 @@ export default function AppointmentsPage() {
           </div>
         )}
       </div>
+
+      {createOpen && (
+        <AppointmentCreateModal
+          services={services.data ?? []}
+          doctors={doctors.data ?? []}
+          onClose={() => setCreateOpen(false)}
+        />
+      )}
 
       <AppointmentDetailModal appointmentId={selectedId} onClose={() => setSelectedId(null)} />
     </div>

@@ -90,7 +90,40 @@ export type AppointmentListResponse = {
 };
 
 export type AdminService = Service & { isActive: boolean };
+export type AppointmentCalendarItem = {
+  id: string;
+  patientName: string;
+  phone: string;
+  status: AppointmentStatus;
+  appointmentDate: string;
+  service: { id: string; name: string };
+  doctor: { id: string; name: string } | null;
+};
+
+export type AppointmentCalendarResponse = {
+  from: string;
+  to: string;
+  appointments: AppointmentCalendarItem[];
+};
+
 export type AdminDoctor = Doctor & { isActive: boolean; isVerified: boolean };
+
+export type AppointmentHistoryResponse = {
+  assignments: {
+    id: string;
+    assignedAt: string;
+    reason: string | null;
+    doctor: { id: string; name: string };
+    assignedBy: { name: string } | null;
+  }[];
+  events: {
+    id: string;
+    action: string;
+    details: unknown;
+    createdAt: string;
+    user: { name: string } | null;
+  }[];
+};
 
 export type MessageStatus = 'UNREAD' | 'READ' | 'ARCHIVED';
 

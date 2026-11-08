@@ -14,6 +14,8 @@ import { ErrorBox, ListSkeleton } from '@/components/admin/page-states';
 import { StatusBadge } from '@/components/admin/status-badge';
 import { ConfirmDialog } from '@/components/admin/confirm-dialog';
 import { AssignDoctorModal } from '@/components/admin/appointments/assign-doctor-modal';
+import { AppointmentRescheduleModal } from '@/components/admin/appointments/appointment-reschedule-modal';
+import { AppointmentHistory } from '@/components/admin/appointments/appointment-history';
 
 type Props = {
   appointmentId: string | null;
@@ -38,6 +40,7 @@ function AppointmentDetailBody({ id }: { id: string }) {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [reason, setReason] = useState('');
   const [assignOpen, setAssignOpen] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
 
   if (detail.isLoading) return <ListSkeleton rows={2} />;
   if (detail.isError) {
@@ -108,7 +111,18 @@ function AppointmentDetailBody({ id }: { id: string }) {
         onAssign={() => setAssignOpen(true)}
         onCancel={() => setPendingAction('CANCELLED')}
         onNoShow={() => setPendingAction('NO_SHOW')}
+        onReschedule={() => setRescheduleOpen(true)}
       />
+
+      <AppointmentHistory id={appointmentId} />
+
+      {rescheduleOpen && (
+        <AppointmentRescheduleModal
+          appointmentId={appointmentId}
+          currentDate={a.appointmentDate}
+          onClose={() => setRescheduleOpen(false)}
+        />
+      )}
 
       <ConfirmDialog
         open={pendingAction !== null}
@@ -163,10 +177,11 @@ type ActionBarProps = {
   onAssign: () => void;
   onCancel: () => void;
   onNoShow: () => void;
+  onReschedule: () => void;
 };
 
 function ActionBar({
-  status, canMarkNoShow, canAssign, busy, checkingIn, onConfirm, onCheckIn, onAssign, onCancel, onNoShow,
+  status, canMarkNoShow, canAssign, busy, checkingIn, onConfirm, onCheckIn, onAssign, onCancel, onNoShow, onReschedule,
 }: ActionBarProps) {
   const isOpenStatus = status === 'PENDING' || status === 'CONFIRMED';
 
@@ -177,6 +192,11 @@ function ActionBar({
         {status === 'CONFIRMED' && <Button disabled={busy} onClick={onCheckIn}>{checkingIn ? 'Checking in...' : 'Check in patient'}</Button>}
         {canAssign && <Button variant="outline" disabled={busy} onClick={onAssign}>Assign doctor</Button>}
         {canMarkNoShow && <Button variant="outline" disabled={busy} onClick={onNoShow}>Mark no-show</Button>}
+        {isOpenStatus && (
+          <Button variant="outline" disabled={busy} onClick={onReschedule}>
+            Reschedule
+          </Button>
+        )}
         {isOpenStatus && (
           <Button variant="outline" disabled={busy} onClick={onCancel} className="text-red-700 hover:bg-red-50">
             Cancel appointment

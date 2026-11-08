@@ -5,12 +5,19 @@ import rateLimit from 'express-rate-limit';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../lib/AppError.js';
 import { CLINIC } from '../../lib/clinic.js';
-import { clinicDayRange, isValidSlot, slotsForDate } from '../../lib/slots.js';
+import { clinicDayRange, slotsForDate } from '../../lib/slots.js';
 import { validateBody, validateQuery } from '../../middleware/validation.middleware.js';
 import { requireAuth } from '../../middleware/auth.middleware.js';
 import { phoneSchema } from '../../lib/phone.js';
 import { AppointmentStatus, Prisma, UserRole } from '@prisma/client';
 import { requireRole } from '../../middleware/requireRole.js';
+import {
+  assertBookableSlot,
+  createAppointmentByStaff,
+  getAppointmentHistory,
+  listAppointmentsInRange,
+  rescheduleAppointment,
+} from './appointment-scheduling.service.js';
 import {
   scheduleAppointmentNotifications,  cancelAppointmentNotifications,
 } from '../notifications/notification.service.js';
@@ -157,18 +164,7 @@ const counts = new Map<number, number>(
 
 router.post('/', bookingLimiter, validateBody(createSchema), async (_req, res) => {
   const data = res.locals.body as z.infer<typeof createSchema>;
-  const t = data.appointmentDate.getTime();
-  const now = Date.now();
-
-  if (t < now + CLINIC.minLeadMinutes * 60_000) {
-    throw new AppError(400, 'Please choose a later time');
-  }
-  if (t > now + CLINIC.bookingWindowDays * 24 * 60 * 60_000) {
-    throw new AppError(400, `Bookings open up to ${CLINIC.bookingWindowDays} days ahead`);
-  }
-  if (!isValidSlot(data.appointmentDate)) {
-    throw new AppError(400, 'Selected time is outside clinic hours');
-  }
+  assertBookableSlot(data.appointmentDate);
 
 const appointment = await prisma.$transaction(
   async (tx: Prisma.TransactionClient) => {
@@ -297,6 +293,29 @@ router.get(
         hasPreviousPage: page > 1,
       },
     });
+  },
+);
+
+const calendarQuerySchema = z.object({ from: z.iso.date(), to: z.iso.date() });
+
+router.get(
+  '/calendar',
+  requireAuth,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.RECEPTIONIST),
+  validateQuery(calendarQuerySchema),
+  async (_req, res) => {
+    const { from, to } = res.locals.query as z.infer<typeof calendarQuerySchema>;
+    const start = new Date(`${from}T00:00:00+03:00`);
+    const end = new Date(`${to}T00:00:00+03:00`);
+    end.setTime(end.getTime() + 24 * 60 * 60 * 1000);
+
+    const days = (end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000);
+    if (days <= 0 || days > 62) {
+      throw new AppError(400, 'Calendar range must be between 1 and 62 days');
+    }
+
+    const appointments = await listAppointmentsInRange(start, end);
+    res.json({ from, to, appointments });
   },
 );
 
@@ -622,21 +641,45 @@ router.patch(
       );
     }
 
-    // Assign the appointment.
-    const updatedAppointment = await prisma.appointment.update({
-      where: { id: appointmentId },
-      data: {
-        doctorId: doctor.id,
-      },
-      include: {
-        doctor: {
-          select: {
-            id: true,
-            name: true,
-            specialization: true,
+    const actorId = res.locals.userId;
+    if (!actorId) throw new AppError(401, 'Authentication required');
+
+    const updatedAppointment = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const updated = await tx.appointment.update({
+        where: { id: appointmentId },
+        data: {
+          doctorId: doctor.id,
+        },
+        include: {
+          doctor: {
+            select: {
+              id: true,
+              name: true,
+              specialization: true,
+            },
           },
         },
-      },
+      });
+
+      await tx.appointmentAssignment.create({
+        data: {
+          appointmentId,
+          doctorId: doctor.id,
+          assignedById: actorId,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: actorId,
+          action: 'APPOINTMENT_DOCTOR_ASSIGNED',
+          entityType: 'APPOINTMENT',
+          entityId: appointmentId,
+          details: { doctorId: doctor.id },
+        },
+      });
+
+      return updated;
     });
 
     if (updatedAppointment.email) {
@@ -744,123 +787,87 @@ router.get(
 );
 
 
+
+const staffCreateSchema = z.object({
+  patientName: z.string().trim().min(2).max(100),
+  phone: phoneSchema,
+  email: z.email().optional(),
+  serviceId: z.uuid(),
+  doctorId: z.uuid().optional(),
+  appointmentDate: z.iso.datetime({ offset: true }).transform((v) => new Date(v)),
+  message: z.string().trim().max(1000).optional(),
+});
+
+const rescheduleSchema = z.object({
+  appointmentDate: z.iso.datetime({ offset: true }).transform((v) => new Date(v)),
+  reason: z.string().trim().max(500).optional(),
+});
+
+// Staff-created bookings are confirmed immediately and bypass the public PENDING flow.
 router.post(
-  '/:id/check-in',
+  '/admin',
   requireAuth,
-  requireRole(
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.RECEPTIONIST,
-  ),
-  validateBody(checkInAppointmentSchema),
-  async (req, res) => {
-    const id = Array.isArray(req.params.id)
-      ? req.params.id[0]
-      : req.params.id;
-
-    if (!id) throw new AppError(400, 'Invalid appointment ID');
-
-    const { patientId } = checkInAppointmentSchema.parse(req.body);
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.RECEPTIONIST),
+  validateBody(staffCreateSchema),
+  async (_req, res) => {
+    const data = res.locals.body as z.infer<typeof staffCreateSchema>;
     const actorId = res.locals.userId;
-
     if (!actorId) throw new AppError(401, 'Authentication required');
 
-    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const appointment = await tx.appointment.findUnique({
-        where: { id },
-      });
-
-      if (!appointment) throw new AppError(404, 'Appointment not found');
-
-      if (appointment.status !== 'CONFIRMED') {
-        throw new AppError(
-          400,
-          'Only confirmed appointments can be checked in',
-        );
-      }
-
-      if (appointment.patientId) {
-        throw new AppError(
-          409,
-          'This appointment is already linked to a patient',
-        );
-      }
-
-      let patient;
-
-      if (patientId) {
-        patient = await tx.patient.findUnique({
-          where: { id: patientId },
-        });
-
-        if (!patient) throw new AppError(404, 'Patient not found');
-      } else {
-        // Reuse an existing patient with the same phone number.
-        patient = await tx.patient.findFirst({
-          where: { phone: appointment.phone },
-        });
-
-        // Create the patient only if no matching record exists.
-        if (!patient) {
-          patient = await tx.patient.create({
-            data: {
-              name: appointment.patientName,
-              phone: appointment.phone,
-              email: appointment.email,
-            },
-          });
-        }
-      }
-
-      const updated = await tx.appointment.updateMany({
-        where: {
-          id,
-          status: 'CONFIRMED',
-          patientId: null,
-        },
-        data: {
-          status: 'CHECKED_IN',
-          patientId: patient.id,
-        },
-      });
-
-      if (updated.count !== 1) {
-        throw new AppError(
-          409,
-          'Appointment was modified by another request. Refresh and try again.',
-        );
-      }
-
-      await tx.auditLog.create({
-        data: {
-          userId: actorId,
-          action: 'APPOINTMENT_CHECKED_IN',
-          entityType: 'APPOINTMENT',
-          entityId: id,
-          details: {
-            patientId: patient.id,
-          },
-        },
-      });
-
-      return {
-        patient,
-        appointment: await tx.appointment.findUnique({
-          where: { id },
-          include: {
-            service: true,
-            doctor: {
-              select: { id: true, name: true, specialization: true },
-            },
-          },
-        }),
-      };
+    const appointment = await createAppointmentByStaff({
+      actorId,
+      patientName: data.patientName,
+      phone: data.phone,
+      email: data.email ?? null,
+      serviceId: data.serviceId,
+      doctorId: data.doctorId ?? null,
+      appointmentDate: data.appointmentDate,
+      message: data.message ?? null,
     });
 
-    res.json({
-      message: 'Patient checked in successfully',
-      ...result,
+    res.status(201).json({ message: 'Appointment created', appointment });
+  },
+);
+
+router.patch(
+  '/:id/reschedule',
+  requireAuth,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.RECEPTIONIST),
+  validateBody(rescheduleSchema),
+  async (req, res) => {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    if (!id) throw new AppError(400, 'Invalid appointment ID');
+
+    const data = res.locals.body as z.infer<typeof rescheduleSchema>;
+    const actorId = res.locals.userId;
+    if (!actorId) throw new AppError(401, 'Authentication required');
+
+    const appointment = await rescheduleAppointment({
+      actorId,
+      appointmentId: id,
+      appointmentDate: data.appointmentDate,
+      reason: data.reason ?? null,
     });
+
+    res.json({ message: 'Appointment rescheduled', appointment });
+  },
+);
+
+router.get(
+  '/:id/history',
+  requireAuth,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.RECEPTIONIST),
+  async (req, res) => {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    if (!id) throw new AppError(400, 'Invalid appointment ID');
+
+    const exists = await prisma.appointment.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!exists) throw new AppError(404, 'Appointment not found');
+
+    res.json(await getAppointmentHistory(id));
   },
 );
 
