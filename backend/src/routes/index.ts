@@ -13,6 +13,8 @@ import doctorDocumentRouter from '../modules/doctors/doctor-document.routes.js';
 import invoiceRoutes from '../modules/invoices/invoice.route.js';
 import financialReportRoutes from '../modules/reports/financial-report.routes.js';
 import dashboardRoutes from '../modules/dashboard/dashboard.routes.js';
+import notificationRoutes from '../modules/notifications/notification.route.js';
+
 
 const router = Router();
 
@@ -32,5 +34,6 @@ router.use('/doctor-documents', doctorDocumentRouter);
 router.use('/invoices', invoiceRoutes);
 router.use('/reports', financialReportRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/notifications', notificationRoutes);
 
 export default router

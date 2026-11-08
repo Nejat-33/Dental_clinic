@@ -11,6 +11,15 @@ import { requireAuth } from '../../middleware/auth.middleware.js';
 import { phoneSchema } from '../../lib/phone.js';
 import { AppointmentStatus, Prisma, UserRole } from '@prisma/client';
 import { requireRole } from '../../middleware/requireRole.js';
+import {
+  scheduleAppointmentNotifications,  cancelAppointmentNotifications,
+} from '../notifications/notification.service.js';
+import { AppointmentNotificationType } from '@prisma/client';
+
+import {
+  queueAppointmentEmailNotification,
+} from '../notifications/notification.service.js';
+
 
 
 const router = Router();
@@ -130,8 +139,12 @@ router.get('/availability', validateQuery(availabilitySchema), async (_req, res)
     where: { ...{ appointmentDate: clinicDayRange(date) }, status: { in: ACTIVE } },
     _count: true,
   });
-  const counts = new Map(grouped.map((g) => [g.appointmentDate.getTime(), g._count]));
-  const earliest = Date.now() + CLINIC.minLeadMinutes * 60_000;
+const counts = new Map<number, number>(
+  grouped.map((g) => [
+    g.appointmentDate.getTime(),
+    typeof g._count === 'number' ? g._count : 0,
+  ]),
+);  const earliest = Date.now() + CLINIC.minLeadMinutes * 60_000;
 
   res.json({
     date,
@@ -158,7 +171,7 @@ router.post('/', bookingLimiter, validateBody(createSchema), async (_req, res) =
   }
 
 const appointment = await prisma.$transaction(
-  async (tx) => {
+  async (tx: Prisma.TransactionClient) => {
     const service = await tx.service.findFirst({
       where: { id: data.serviceId, isActive: true },
       select: { id: true },
@@ -371,7 +384,7 @@ router.patch(
 
     if (!actorId) throw new AppError(401, 'Authentication required');
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const appointment = await tx.appointment.findUnique({
         where: { id },
         select: {
@@ -445,6 +458,25 @@ router.patch(
       });
     });
 
+    
+        // Schedule confirmation and reminders after the transaction commits.
+    if (status === 'CONFIRMED' && result?.email) {
+      try {
+        await scheduleAppointmentNotifications({
+          appointmentId: result.id,
+          recipient: result.email,
+          patientName: result.patientName,
+          appointmentDate: result.appointmentDate,
+          serviceName: result.service.name,
+          doctorName: result.doctor?.name,
+        });
+      } catch (error) {
+        console.error(
+          '[Appointment Notification] Failed to queue notifications:',
+          error,
+        );
+      }
+    }
     res.json({
       message: `Appointment ${status.toLowerCase()} successfully`,
       appointment: result,
@@ -464,7 +496,7 @@ if (typeof id !== 'string') {
 }
   const { patientId } = checkInSchema.parse(req.body);
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const appointment = await tx.appointment.findUnique({
       where: { id },
     });
@@ -546,9 +578,15 @@ router.patch(
     const appointment = await prisma.appointment.findUnique({
       where: { id: appointmentId },
       select: {
-        id: true,
-        status: true,
-      },
+  id: true,
+  status: true,
+  email: true,
+  patientName: true,
+  appointmentDate: true,
+  service: {
+    select: { name: true },
+  },
+},
     });
 
     if (!appointment) {
@@ -600,6 +638,26 @@ router.patch(
         },
       },
     });
+
+    if (updatedAppointment.email) {
+  try {
+    await queueAppointmentEmailNotification({
+      appointmentId: updatedAppointment.id,
+      type: AppointmentNotificationType.DOCTOR_ASSIGNED,
+      recipient: updatedAppointment.email,
+      patientName: updatedAppointment.patientName,
+      appointmentDate: updatedAppointment.appointmentDate,
+      serviceName: appointment.service.name,
+      doctorName: doctor.name,
+      idempotencyKey: `appointment:${updatedAppointment.id}:doctor-assigned:${doctor.id}`,
+    });
+  } catch (error) {
+    console.error(
+      '[Appointment Notification] Failed to queue doctor assignment:',
+      error,
+    );
+  }
+}
 
     res.json({
       message: 'Appointment assigned successfully',
@@ -707,7 +765,7 @@ router.post(
 
     if (!actorId) throw new AppError(401, 'Authentication required');
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const appointment = await tx.appointment.findUnique({
         where: { id },
       });

@@ -2,12 +2,14 @@
 import { app } from './app.js';
 import { env } from './config/env.js';
 import { prisma } from './lib/prisma.js';
+import { startNotificationWorker } from './modules/notifications/notification.worker.js';
 
 async function main() {
   await prisma.$connect(); 
 
   const server = app.listen(env.PORT, () => {
-    console.log(`API listening on port ${env.PORT}`);
+  console.log(`Server running on port ${env.PORT}`);
+  startNotificationWorker();
   });
 
   const shutdown = (signal: string) => {
