@@ -47,7 +47,13 @@ export type BookingConfirmation = {
   service: { name: string };
 };
 
-export type AppointmentStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
+export type AppointmentStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'CHECKED_IN'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'NO_SHOW';
 
 export type AdminUser = { id: string; name: string; email: string };
 
@@ -55,6 +61,8 @@ export type Paginated<T> = {
   data: T[];
   meta: { page: number; limit: number; total: number; pages: number };
 };
+
+export type AppointmentDoctor = { id: string; name: string; specialization: string };
 
 export type Appointment = {
   id: string;
@@ -66,10 +74,23 @@ export type Appointment = {
   status: AppointmentStatus;
   createdAt: string;
   service: { id: string; name: string };
+  doctor: AppointmentDoctor | null;
+};
+
+export type AppointmentListResponse = {
+  appointments: Appointment[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
 };
 
 export type AdminService = Service & { isActive: boolean };
-export type AdminDoctor = Doctor & { isActive: boolean };
+export type AdminDoctor = Doctor & { isActive: boolean; isVerified: boolean };
 
 export type MessageStatus = 'UNREAD' | 'READ' | 'ARCHIVED';
 

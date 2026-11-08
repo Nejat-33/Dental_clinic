@@ -9,7 +9,7 @@ import { api, ApiError } from '@/lib/api';
 import { useAdmin } from '@/lib/auth';
 import { cn } from '@/lib/cn';
 import { toast } from 'sonner';
-import { Appointment, Paginated } from '@/types/api';
+import type { AppointmentListResponse } from '@/types/api';
 import { site } from '@/config/site';
 
 
@@ -40,18 +40,18 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 const unreadCount = unread.data?.count ?? 0;
  const pending = useQuery({
   queryKey: ['appointments', 'pending-count'],
-  queryFn: () => api<Paginated<Appointment>>('/appointments?status=PENDING&page=1&limit=1'),
+  queryFn: () => api<AppointmentListResponse>('/appointments?status=PENDING&page=1&limit=1'),
   enabled: !!me.data,
   refetchInterval: 30_000,
   refetchIntervalInBackground: true,
 });
-const pendingCount = pending.data?.meta.total ?? 0;
+const pendingCount = pending.data?.pagination.total ?? 0;
 const lastCount = useRef<number | null>(null);
 
 // Toast whenever the pending count goes up (not on first load, not when you confirm one)
 useEffect(() => {
   if (!pending.data) return;
-  const total = pending.data.meta.total;
+  const total = pending.data.pagination.total;
   if (lastCount.current !== null && total > lastCount.current) {
     const n = total - lastCount.current;
     toast.info(n === 1 ? 'New appointment request' : `${n} new appointment requests`, {

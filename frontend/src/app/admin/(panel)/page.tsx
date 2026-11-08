@@ -36,7 +36,7 @@ export default function DashboardPage() {
     queryFn: () => api<{ count: number }>('/messages/unread-count'),
   });
 
-  const todaysActive = (todays.data?.data ?? []).filter((a) => a.status !== 'CANCELLED');
+  const todaysActive = (todays.data?.appointments ?? []).filter((a) => a.status !== 'CANCELLED');
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -44,7 +44,7 @@ export default function DashboardPage() {
       <p className="mt-1 text-slate-500">Here&apos;s what needs your attention.</p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <Stat icon={Clock} label="Pending requests" value={pending.data?.meta.total ?? '–'} href="/admin/appointments" />
+        <Stat icon={Clock} label="Pending requests" value={pending.data?.pagination.total ?? '–'} href="/admin/appointments" />
         <Stat icon={CalendarCheck} label="Today's appointments" value={todays.data ? todaysActive.length : '–'} />
         <Stat icon={Mail} label="Unread messages" value={unread.data?.count ?? '–'} />
       </div>
@@ -56,8 +56,8 @@ export default function DashboardPage() {
             <Link href="/admin/appointments" className="text-sm font-semibold text-brand-700">View all</Link>
           </div>
           <ul className="mt-4 divide-y divide-slate-100">
-            {pending.data?.data.length === 0 && <li className="py-6 text-center text-sm text-slate-500">No pending requests 🎉</li>}
-            {pending.data?.data.map((a) => (
+            {pending.data?.appointments.length === 0 && <li className="py-6 text-center text-sm text-slate-500">No pending requests 🎉</li>}
+            {pending.data?.appointments.map((a) => (
               <li key={a.id} className="flex items-center justify-between gap-3 py-3 text-sm">
                 <div>
                   <p className="font-medium text-slate-900">{a.patientName}</p>
